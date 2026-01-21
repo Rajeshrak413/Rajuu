@@ -76,7 +76,7 @@
         <div class="col-lg-5">
             <div class="card p-4 shadow-sm">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier Name (e.g. BlueDart)">
+                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier Name">
                 <label class="fw-bold text-danger d-block text-center">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
                 <div class="d-grid gap-2 mt-4">
@@ -106,18 +106,18 @@
 
     <div id="adminView">
         <div class="row mb-3 align-items-center">
-            <div class="col-md-3"><h4 class="text-primary fw-bold m-0">Management</h4></div>
+            <div class="col-md-3"><h4>Management</h4></div>
             <div class="col-md-6">
                 <div class="input-group">
-                    <input type="text" id="searchAWB" class="form-control border-primary" placeholder="Search AWB..." oninput="loadAdminData()">
-                    <input type="date" id="filterDate" class="form-control border-primary" onchange="loadAdminData()">
+                    <input type="text" id="searchAWB" class="form-control" placeholder="Search AWB..." oninput="loadAdminData()">
+                    <input type="date" id="filterDate" class="form-control" onchange="loadAdminData()">
                     <button class="btn btn-outline-primary" onclick="clearFilters()">Reset</button>
                 </div>
             </div>
             <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button></div>
         </div>
         <div class="card summary-card p-3 mb-4 shadow-sm text-center">
-            <h5 class="m-0 text-uppercase" id="summaryTitle">VOLUME OVERVIEW</h5>
+            <h5 class="m-0 text-uppercase" id="summaryTitle">TOTAL VOLUME</h5>
             <div class="display-4 fw-bold text-primary" id="totalVolumeCount">0</div>
         </div>
         <div id="adminGrid" class="row"></div>
@@ -125,7 +125,7 @@
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndDanger" src="https://assets.mixkit.co/active_storage/sfx/2242/2242-preview.mp3"></audio>
+<audio id="sndAmbulance" src="https://assets.mixkit.co/active_storage/sfx/2859/2859-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -166,8 +166,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndDanger').play();
-                setTimeout(() => alert("🚨 DANGER: DUPLICATE AWB!\nAWB: " + val), 200);
+                document.getElementById('sndAmbulance').play();
+                setTimeout(() => alert("🚨 DUPLICATE AWB!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -179,7 +179,7 @@
 
     function renderScanList() {
         document.getElementById('scanBody').innerHTML = items.map((a, i) => 
-            `<tr><td>${i+1}</td><td class="fw-bold">${a}</td><td><button class="btn btn-sm btn-outline-danger" onclick="window.del(${i})">X</button></td></tr>`
+            `<tr><td>${i+1}</td><td class="fw-bold text-dark">${a}</td><td><button class="btn btn-sm btn-outline-danger" onclick="window.del(${i})">X</button></td></tr>`
         ).join('');
         document.getElementById('totalCount').innerText = items.length;
     }
@@ -188,7 +188,7 @@
     window.confirmSync = async () => {
         if (items.length === 0) return alert("No scans to sync.");
         const cr = document.getElementById('courierType').value || "GENERAL";
-        const isConfirmed = confirm(`MANIFST SUMMARY:\nCourier: ${cr}\nTotal Count: ${items.length}\n\nSync to cloud now?`);
+        const isConfirmed = confirm(`SYNC MANIFEST:\nCourier: ${cr}\nTotal Count: ${items.length}\n\nSync to cloud?`);
         if (isConfirmed) await syncData(cr);
     };
 
@@ -214,7 +214,7 @@
         const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "desc")));
         grid.innerHTML = "";
         let vol = 0; let found = false;
-        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME ON ${fDate}` : "ALL TIME VOLUME";
+        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME ON ${fDate}` : "TOTAL VOLUME";
 
         snap.forEach(docSnap => {
             const d = docSnap.data();
@@ -229,13 +229,19 @@
             col.innerHTML = `
                 <div class="card admin-card p-3 h-100 shadow-sm ${searchVal ? 'highlight-find' : ''}">
                     <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
-                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-2" value="${d.courier}" id="inp-${docSnap.id}" disabled>
+                    <input type="text" class="form-control form-control-sm fw-bold mb-1" value="${d.courier}" id="inp-${docSnap.id}" disabled>
                     <p class="small text-muted mb-2">Op: ${d.operator} | ${ts.toLocaleString()}</p>
                     <div class="d-grid gap-1">
-                        <div class="btn-group"><button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button><button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button></div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
-                        <div class="d-flex gap-1"><button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button><button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button></div>
-                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Manifest</a></div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
+                            <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel/Mail</button>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button>
+                            <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
+                        </div>
+                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
@@ -245,7 +251,7 @@
 
             document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, inp.value, ts);
             document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(inp.value, d.operator, ts.toLocaleString(), d.count, d.awbs);
-            document.getElementById(`cp-${docSnap.id}`).onclick = () => copyTableToClipboard(d.awbs);
+            document.getElementById(`cp-${docSnap.id}`).onclick = () => copyTableToClipboard(d.awbs, inp.value, ts.toLocaleString());
             document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete Manifest?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
             edtBtn.onclick = () => { inp.disabled = false; edtBtn.classList.add('d-none'); savBtn.classList.remove('d-none'); inp.focus(); };
             savBtn.onclick = async () => {
@@ -255,7 +261,6 @@
             };
         });
         document.getElementById('totalVolumeCount').innerText = vol;
-        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No results found.</p>";
     };
 
     function saveExcel(list, op, cr, dObj) {
@@ -277,14 +282,37 @@
         window.print();
     }
 
-    window.preparePrintCurrent = () => runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
+    function copyTableToClipboard(awbs, cr, date) {
+        // Create an HTML structure that Mail clients and Excel recognize
+        let html = `
+            <div style="font-family: Arial, sans-serif;">
+                <h3 style="color: #004a99; margin-bottom: 5px;">MEDIKA BAZAAR MANIFEST</h3>
+                <p><strong>Courier:</strong> ${cr} | <strong>Date:</strong> ${date} | <strong>Total AWBs:</strong> ${awbs.length}</p>
+                <table border="1" cellpadding="5" style="border-collapse: collapse; width: 100%; max-width: 400px; border: 1px solid black;">
+                    <thead>
+                        <tr style="background-color: #f2f2f2;">
+                            <th style="border: 1px solid black;">SL</th>
+                            <th style="border: 1px solid black;">AWB NUMBER</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        awbs.forEach((awb, index) => {
+            html += `
+                <tr>
+                    <td style="border: 1px solid black; text-align: center;">${index + 1}</td>
+                    <td style="border: 1px solid black;">${awb}</td>
+                </tr>`;
+        });
 
-    function copyTableToClipboard(awbs) {
-        let h = `<table border="1" style="border-collapse:collapse;"><tr><th>SL</th><th>AWB NUMBER</th></tr>`;
-        awbs.forEach((a, i) => { h += `<tr><td style="text-align:center;">${i + 1}</td><td>${a}</td></tr>`; });
-        h += `</table>`;
-        const b = new Blob([h], { type: 'text/html' });
-        navigator.clipboard.write([new ClipboardItem({ 'text/html': b })]).then(() => alert("Formatted Table Copied!"));
+        html += `</tbody></table></div>`;
+
+        const blob = new Blob([html], { type: 'text/html' });
+        const data = [new ClipboardItem({ 'text/html': blob })];
+        
+        navigator.clipboard.write(data).then(() => {
+            alert("Table copied! You can now paste this directly into Gmail, Outlook, or Excel with full formatting.");
+        });
     }
 </script>
 </body>
