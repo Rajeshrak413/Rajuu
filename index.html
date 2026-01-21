@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medika Bazaar | AWB System</title>
+    <title>Medika Bazaar | AWB Master</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -17,11 +17,9 @@
         
         #scannerView, #adminView, #printView { display: none; }
 
-        /* Admin UI */
-        .summary-card { background: #e3f2fd; border-left: 8px solid var(--medika); }
-        .admin-card { border-top: 6px solid var(--medika); position: relative; background: white; transition: 0.2s; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
 
+        /* PRINT STYLES */
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
@@ -44,7 +42,7 @@
         <div class="p-count-circle-right" id="p-count"></div>
     </div>
     <div class="print-sub-info">
-        <span><strong>Operator:</strong> <span id="p-op"></span></span>
+        <span><strong>Op:</strong> <span id="p-op"></span></span>
         <span><strong>Date:</strong> <span id="p-date"></span></span>
     </div>
     <div class="print-grid">
@@ -56,18 +54,16 @@
 <nav class="navbar py-3 no-print shadow">
     <div class="container d-flex justify-content-between">
         <h3 class="m-0 font-weight-bold">MEDIKA BAZAAR</h3>
-        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT / HOME</button>
+        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">HOME</button>
     </div>
 </nav>
 
 <div class="container mt-4 no-print">
     <div id="loginView" class="row justify-content-center mt-5">
-        <div class="col-md-5">
-            <div class="card p-5 text-center shadow">
-                <h2 class="mb-4 text-primary font-weight-bold">Logistics Portal</h2>
-                <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
-                <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ENTER</button>
-            </div>
+        <div class="col-md-5 card p-5 text-center shadow">
+            <h2 class="mb-4 text-primary font-weight-bold">Warehouse Portal</h2>
+            <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
+            <button class="btn btn-primary w-100 btn-lg" onclick="handleLogin()">ENTER</button>
         </div>
     </div>
 
@@ -95,7 +91,7 @@
                 </div>
                 <div class="table-responsive border rounded" style="max-height: 500px;">
                     <table class="table table-hover text-center m-0">
-                        <thead class="table-dark sticky-top"><tr><th>SL</th><th>AWB Number</th><th class="edit-col d-none">Action</th></tr></thead>
+                        <thead class="table-dark sticky-top"><tr><th>SL</th><th>AWB Number</th><th class="edit-col d-none">X</th></tr></thead>
                         <tbody id="scanBody"></tbody>
                     </table>
                 </div>
@@ -112,10 +108,10 @@
                     <input type="date" id="filterDate" class="form-control" onchange="loadAdminData()">
                 </div>
             </div>
-            <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh Data</button></div>
+            <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button></div>
         </div>
-        <div class="card summary-card p-3 mb-4 shadow-sm text-center">
-            <h5 class="m-0 text-uppercase">TOTAL PROCESSED (SELECTED DATE): <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
+        <div class="card p-3 mb-4 shadow-sm text-center bg-light">
+            <h5 class="m-0 text-uppercase">TOTAL PROCESSED (BUCKET): <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
         </div>
         <div id="adminGrid" class="row"></div>
     </div>
@@ -126,7 +122,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyCynM9SUrwBGKjzuXuNjnbQERLjnhM4j2k",
@@ -145,15 +141,19 @@
     let editMode = false;
     let scannerActive = false;
 
-    // Fixed Date Logic: Defaults to current local date
-    const setTodayDate = () => {
+    // BUSINESS DAY LOGIC (00:01 as New Day)
+    const getBusinessDate = () => {
         const now = new Date();
+        // If it's exactly 00:00, we consider it the previous day. 
+        // 00:01 onwards is the current day.
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
-        document.getElementById('filterDate').value = `${year}-${month}-${day}`;
+        return `${year}-${month}-${day}`;
     };
-    setTodayDate();
+
+    const setTodayFilter = () => { document.getElementById('filterDate').value = getBusinessDate(); };
+    setTodayFilter();
 
     window.autoFocusScanner = () => { if(scannerActive && !editMode) document.getElementById('awbInput').focus(); };
 
@@ -169,10 +169,11 @@
         document.getElementById(id).style.display = 'block';
     }
 
+    // SCAN LOGIC
     document.getElementById('awbInput').addEventListener('input', (e) => {
         clearTimeout(scanTimer);
         scanTimer = setTimeout(() => {
-            const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
+            const val = e.target.value.trim();
             if(val.length < 4) return;
             if (items.includes(val)) {
                 document.getElementById('sndPolice').play();
@@ -196,8 +197,7 @@
 
     window.toggleEditMode = () => {
         editMode = !editMode;
-        document.getElementById('toggleEdit').innerText = editMode ? "SAVE" : "EDIT LIST";
-        document.getElementById('toggleEdit').className = editMode ? "btn btn-sm btn-success fw-bold" : "btn btn-sm btn-warning fw-bold";
+        document.getElementById('toggleEdit').innerText = editMode ? "LOCK" : "EDIT";
         renderScanList();
     };
 
@@ -205,22 +205,49 @@
 
     window.confirmSync = async () => {
         const cr = document.getElementById('courierType').value || "GENERAL";
-        if (items.length === 0) return alert("List is empty");
-        if (confirm(`Confirm Sync for ${cr} (${items.length} AWBs)?`)) {
-            try {
-                await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
-                alert("Synced Successfully!"); 
-                items = []; 
-                renderScanList();
-                setTodayDate(); // Ensure Admin filter is on today
-                if(document.getElementById('adminView').style.display === 'block') loadAdminData();
-            } catch (err) { alert("Sync Error: " + err.message); }
+        if (items.length === 0) return alert("Empty");
+        if (confirm(`Sync ${items.length} AWBs for ${cr}?`)) {
+            await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
+            alert("Synced!"); items = []; renderScanList();
+            setTodayFilter();
+            if(document.getElementById('adminView').style.display === 'block') loadAdminData();
+        }
+    };
+
+    // FIX EXPORTS: PDF, Excel, Print
+    window.runExport = (type, data) => {
+        const { courier, operator, date, count, awbs } = data;
+        if(type === 'print') {
+            document.getElementById('p-courier').innerText = courier;
+            document.getElementById('p-op').innerText = operator;
+            document.getElementById('p-date').innerText = date;
+            document.getElementById('p-count').innerText = count;
+            const mid = Math.ceil(awbs.length / 2);
+            document.getElementById('p-body-1').innerHTML = awbs.slice(0, mid).map((a, i) => `<tr><td>${i+1}</td><td>${a}</td></tr>`).join('');
+            document.getElementById('p-body-2').innerHTML = awbs.slice(mid).map((a, i) => `<tr><td>${mid+i+1}</td><td>${a}</td></tr>`).join('');
+            window.print();
+        } else if(type === 'pdf') {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFontSize(10); doc.text("MEDIKA BAZAAR", 105, 10, { align: "center" });
+            doc.setFontSize(40); doc.text(courier.toUpperCase(), 15, 35);
+            doc.circle(180, 30, 15); doc.setFontSize(20); doc.text(count.toString(), 180, 32, { align: "center" });
+            doc.line(15, 45, 195, 45); doc.setFontSize(11); doc.text(`Op: ${operator} | Date: ${date}`, 15, 52);
+            const mid = Math.ceil(awbs.length / 2);
+            doc.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i + 1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
+            doc.autoTable({ body: awbs.slice(mid).map((a, i) => [mid + i + 1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
+            doc.save(`${courier}.pdf`);
+        } else if(type === 'excel') {
+            const wb = XLSX.utils.book_new();
+            const wsData = [["SL", "AWB NUMBER"]];
+            awbs.forEach((a, i) => wsData.push([i+1, a]));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
+            XLSX.writeFile(wb, `${courier}.xlsx`);
         }
     };
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid');
-        grid.innerHTML = "<p class='p-5 text-center'>Loading Today's Bucket...</p>";
         const q = query(collection(db, "manifests"), orderBy("time", "desc"));
         const snap = await getDocs(q);
         grid.innerHTML = ""; let vol = 0;
@@ -230,27 +257,27 @@
         snap.forEach(docSnap => {
             const d = docSnap.data();
             const ts = d.time ? d.time.toDate() : new Date();
-            const dateStr = ts.toISOString().split('T')[0];
-            
-            // Strictly show only selected date (defaulting to today)
-            if (fDate && dateStr !== fDate) return;
-            if (search && !d.awbs.some(a => a.includes(search))) return;
+            const recDate = ts.toISOString().split('T')[0];
+            if(fDate && recDate !== fDate) return;
+            if(search && !d.awbs.some(a => a.includes(search))) return;
 
             vol += d.count;
+            const cardData = JSON.stringify({ courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs });
+            
             const col = document.createElement('div');
             col.className = "col-md-4 mb-4";
             col.innerHTML = `
                 <div class="card admin-card p-3 h-100 shadow-sm">
                     <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
                     <input type="text" class="form-control form-control-sm fw-bold border-primary mb-1" value="${d.courier}" id="inp-${docSnap.id}">
-                    <p class="small text-muted mb-2">Op: ${d.operator} | ${ts.toLocaleTimeString()}</p>
+                    <p class="small text-muted mb-2">${ts.toLocaleTimeString()} | User: ${d.operator}</p>
                     <div class="d-grid gap-1">
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-dark" onclick="window.runPrint('${d.courier}','${d.operator}','${ts.toLocaleString()}',${d.count},${JSON.stringify(d.awbs)})">Print</button>
-                            <button class="btn btn-sm btn-info text-white" onclick="window.downloadPDF(${JSON.stringify(d.awbs)},'${d.courier}','${d.operator}','${ts.toLocaleString()}')">PDF</button>
+                            <button class="btn btn-sm btn-dark" onclick='runExport("print", ${cardData})'>Print</button>
+                            <button class="btn btn-sm btn-info text-white" onclick='runExport("pdf", ${cardData})'>PDF</button>
                         </div>
-                        <button class="btn btn-sm btn-success" onclick="window.saveExcel(${JSON.stringify(d.awbs)},'${d.operator}','${d.courier}','${ts.toLocaleString()}')">Excel Export</button>
-                        <button class="btn btn-sm btn-warning" onclick="window.updateC('${docSnap.id}')">Update Name</button>
+                        <button class="btn btn-sm btn-success" onclick='runExport("excel", ${cardData})'>Excel</button>
+                        <button class="btn btn-sm btn-warning" onclick="window.updateC('${docSnap.id}')">Update Courier</button>
                         <div class="text-center mt-2"><a class="text-danger small fw-bold" onclick="window.deleteRec('${docSnap.id}')" style="cursor:pointer">Delete Manifest</a></div>
                     </div>
                 </div>`;
@@ -259,47 +286,16 @@
         document.getElementById('totalVolumeCount').innerText = vol;
     };
 
-    window.downloadPDF = (awbs, cr, op, date) => {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.setFontSize(10); doc.text("MEDIKA BAZAAR LOGISTICS", 105, 10, { align: "center" });
-        doc.setFontSize(45); doc.text(cr.toUpperCase(), 15, 35);
-        doc.setLineWidth(1); doc.circle(180, 30, 15);
-        doc.setFontSize(22); doc.text(awbs.length.toString(), 180, 32, { align: "center" });
-        doc.line(15, 45, 195, 45); doc.setFontSize(12); doc.text(`Op: ${op} | Date: ${date}`, 15, 52);
-        const mid = Math.ceil(awbs.length / 2);
-        doc.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i + 1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
-        doc.autoTable({ body: awbs.slice(mid).map((a, i) => [mid + i + 1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
-        doc.save(`${cr}_${date}.pdf`);
-    };
-
-    window.saveExcel = (list, op, cr, dt) => {
-        const wb = XLSX.utils.book_new();
-        const wsData = [["SL", "AWB"]]; list.forEach((a, i) => wsData.push([i+1, a]));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
-        XLSX.writeFile(wb, `${cr}_${dt}.xlsx`);
-    };
-
-    window.runPrint = (cr, op, date, count, awbs) => {
-        document.getElementById('p-courier').innerText = cr;
-        document.getElementById('p-op').innerText = op;
-        document.getElementById('p-date').innerText = date;
-        document.getElementById('p-count').innerText = count;
-        const mid = Math.ceil(awbs.length / 2);
-        document.getElementById('p-body-1').innerHTML = awbs.slice(0, mid).map((a, i) => `<tr><td>${i+1}</td><td>${a}</td></tr>`).join('');
-        document.getElementById('p-body-2').innerHTML = awbs.slice(mid).map((a, i) => `<tr><td>${mid+i+1}</td><td>${a}</td></tr>`).join('');
-        window.print();
-    };
-
     window.updateC = async (id) => {
-        const val = document.getElementById(`inp-${id}`).value;
-        await updateDoc(doc(db, "manifests", id), { courier: val });
+        await updateDoc(doc(db, "manifests", id), { courier: document.getElementById(`inp-${id}`).value });
         alert("Updated!"); loadAdminData();
     };
 
-    window.deleteRec = async (id) => { if(confirm("Delete Record?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
-    window.preparePrintCurrent = () => window.runPrint(document.getElementById('courierType').value || "GEN", opName, new Date().toLocaleString(), items.length, items);
-    window.downloadExcelUser = () => window.saveExcel(items, opName, document.getElementById('courierType').value || "Manifest", new Date().toLocaleString());
+    window.deleteRec = async (id) => { if(confirm("Delete?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
+    
+    // User View Exports
+    window.preparePrintCurrent = () => window.runExport("print", { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items });
+    window.downloadExcelUser = () => window.runExport("excel", { courier: document.getElementById('courierType').value || "GEN", awbs: items });
 </script>
 </body>
 </html>
