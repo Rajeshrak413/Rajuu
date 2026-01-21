@@ -11,11 +11,23 @@
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .scan-input { font-size: 2.2rem; height: 85px; border: 3px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); }
+        
+        /* High Visibility Scan Area */
+        .scan-input { 
+            font-size: 2.2rem; 
+            height: 90px; 
+            border: 4px solid var(--medika); 
+            text-align: center; 
+            font-weight: bold; 
+            background: #fffde7; 
+            color: var(--medika);
+            white-space: nowrap;
+            overflow: hidden;
+        }
         
         #scannerView, #adminView, #printView { display: none; }
 
-        /* Admin UI */
+        /* Admin Dashboard UI */
         .admin-card { border-top: 6px solid var(--medika); position: relative; background: white; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .btn-delete-record { color: var(--danger); font-size: 0.85rem; font-weight: bold; cursor: pointer; text-decoration: none; }
@@ -70,11 +82,11 @@
             <div class="card p-4 shadow-sm">
                 <div class="mb-3">
                     <p class="mb-1 text-muted">Operator: <b id="displayUser" class="text-dark"></b></p>
-                    <label class="fw-bold">Courier Type (Manual)</label>
-                    <input type="text" id="courierType" class="form-control p-2 border-primary" placeholder="e.g. BlueDart">
+                    <label class="fw-bold">Courier Type</label>
+                    <input type="text" id="courierType" class="form-control p-2 border-primary" placeholder="Manual Entry (e.g. BlueDart)">
                 </div>
                 <div class="mb-4 text-center">
-                    <label class="fw-bold text-danger">SCAN AWB (AUTO-SUBMIT)</label>
+                    <label class="fw-bold text-danger">SCAN AWB NUMBER</label>
                     <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
                 </div>
                 <div class="d-grid gap-2">
@@ -159,11 +171,13 @@
     const awbIn = document.getElementById('awbInput');
     awbIn.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            const val = awbIn.value.trim();
+            // Clean the input to prevent double-line issues
+            const val = awbIn.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
+            
             if (items.includes(val)) {
                 document.getElementById('sndSiren').play();
-                setTimeout(() => alert("🚨 DUPLICATE DETECTED: " + val), 200);
+                setTimeout(() => alert("🚨 DANGER: DUPLICATE SCAN!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -182,9 +196,9 @@
     window.del = (i) => { items.splice(i, 1); renderScanList(); };
 
     window.syncData = async () => {
-        if (items.length === 0) return alert("No scans to sync.");
+        if (items.length === 0) return alert("No data scanned.");
         const courier = document.getElementById('courierType').value || "N/A";
-        if(!confirm(`Upload ${items.length} AWBs?`)) return;
+        if(!confirm(`Upload ${items.length} AWBs for ${courier}?`)) return;
         try {
             document.getElementById('syncBtn').disabled = true;
             await addDoc(collection(db, "manifests"), {
@@ -204,6 +218,7 @@
         awbList.forEach((a, i) => wsData.push([i+1, a]));
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         XLSX.utils.book_append_sheet(wb, ws, "Manifest");
+        
         const d = dateObj.getDate().toString().padStart(2, '0');
         const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
         const y = dateObj.getFullYear();
@@ -213,11 +228,15 @@
     }
 
     window.downloadExcelUser = () => {
-        if(items.length === 0) return alert("No data");
+        if(items.length === 0) return alert("Empty");
         saveExcel(items, opName, document.getElementById('courierType').value || "Manifest", new Date());
     }
 
-    // Shared Print function
+    window.preparePrintCurrent = () => {
+        if(items.length === 0) return alert("Empty");
+        runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
+    }
+
     function runPrint(cr, op, date, count, awbs) {
         document.getElementById('p-courier').innerText = cr.toUpperCase();
         document.getElementById('p-op').innerText = op;
@@ -225,11 +244,6 @@
         document.getElementById('p-count').innerText = count;
         document.getElementById('p-body').innerHTML = awbs.map((a, i) => `<tr><td>${i+1}</td><td>${a}</td></tr>`).join('');
         window.print();
-    }
-
-    window.preparePrintCurrent = () => {
-        if(items.length === 0) return alert("Nothing to print");
-        runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
     }
 
     window.loadAdminData = async () => {
@@ -253,7 +267,7 @@
                     <hr>
                     <div class="d-flex flex-column gap-2">
                         <div class="d-flex justify-content-between">
-                            <button class="btn btn-sm btn-dark px-3" id="pr-${docSnap.id}">Print Manifest</button>
+                            <button class="btn btn-sm btn-dark px-3" id="pr-${docSnap.id}">Print</button>
                             <button class="btn btn-sm btn-success px-3" id="dl-${docSnap.id}">Excel</button>
                         </div>
                         <div class="text-center mt-1">
@@ -266,7 +280,7 @@
             document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, d.courier, timestamp);
             document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(d.courier, d.operator, timestamp.toLocaleString(), d.count, d.awbs);
             document.getElementById(`del-${docSnap.id}`).onclick = async () => {
-                if(confirm("Delete this record permanently?")) {
+                if(confirm("Delete Record?")) {
                     await deleteDoc(doc(db, "manifests", docSnap.id));
                     loadAdminData();
                 }
