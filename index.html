@@ -13,7 +13,8 @@
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); }
+        /* Keyboard-free scan input styling */
+        .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); cursor: default; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
 
@@ -51,7 +52,7 @@
 <nav class="navbar py-3 no-print shadow">
     <div class="container d-flex justify-content-between align-items-center">
         <h3 class="m-0 fw-bold">MEDIKA BAZAAR</h3>
-        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">HOME / LOGOUT</button>
+        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT</button>
     </div>
 </nav>
 
@@ -71,9 +72,10 @@
             <div class="card p-4 shadow-sm mb-3 text-center border-top border-primary">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
                 <input type="text" id="courierType" class="form-control mb-3 text-center fw-bold" placeholder="Courier Name">
-                <label class="fw-bold text-danger d-block">SCAN AWB NUMBER</label>
-                <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
-                <div class="d-grid gap-2 mt-4">
+                <label class="fw-bold text-danger d-block mb-1">SCAN AWB NUMBER</label>
+                <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off" inputmode="none">
+                <p class="small text-muted mt-1">(Keyboard Disabled for Scanning)</p>
+                <div class="d-grid gap-2 mt-3">
                     <button id="syncBtn" class="btn btn-success btn-lg fw-bold shadow" onclick="confirmSync()">COMPLETE & SYNC</button>
                     <div class="row g-2">
                         <div class="col-6"><button class="btn btn-dark w-100 py-2" onclick="preparePrintCurrent()">PRINT</button></div>
@@ -100,7 +102,7 @@
 
     <div id="adminView">
         <div class="row mb-3 align-items-center">
-            <div class="col-md-4"><h4>Admin Dashboard</h4></div>
+            <div class="col-md-4"><h4>Admin Panel</h4></div>
             <div class="col-md-5">
                 <div class="input-group">
                     <span class="input-group-text">Filter Date:</span>
@@ -110,7 +112,7 @@
             <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button></div>
         </div>
         <div class="card p-3 mb-4 shadow-sm text-center bg-white border-start border-primary border-4">
-            <h5 class="m-0 text-uppercase">TOTAL PROCESSED FOR THIS DATE: <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
+            <h5 class="m-0 text-uppercase">DATE TOTAL: <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
         </div>
         <div id="adminGrid" class="row"></div>
     </div>
@@ -140,14 +142,15 @@
     let editMode = false;
     let scannerActive = false;
 
-    // Helper: Get YYYY-MM-DD in local time
-    const getLocalDateString = (dateObj) => {
-        const d = dateObj || new Date();
+    // BUSINESS DAY LOGIC: Strictly 00:01 as a new bucket
+    const getBucketDate = () => {
+        const d = new Date();
+        // Return YYYY-MM-DD format
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     };
 
-    const initDateFilter = () => { document.getElementById('filterDate').value = getLocalDateString(); };
-    initDateFilter();
+    const initFilter = () => { document.getElementById('filterDate').value = getBucketDate(); };
+    initFilter();
 
     window.autoFocusScanner = () => { if(scannerActive && !editMode) document.getElementById('awbInput').focus(); };
 
@@ -163,6 +166,7 @@
         document.getElementById(id).style.display = 'block';
     }
 
+    // AUTO-ENTER SCAN LOGIC
     document.getElementById('awbInput').addEventListener('input', (e) => {
         const val = e.target.value.trim();
         if(val.length < 5) return;
@@ -189,7 +193,7 @@
 
     window.toggleEditMode = () => {
         editMode = !editMode;
-        document.getElementById('toggleEdit').innerText = editMode ? "LOCK LIST" : "EDIT LIST";
+        document.getElementById('toggleEdit').innerText = editMode ? "SAVE LIST" : "EDIT LIST";
         renderScanList();
     };
 
@@ -202,12 +206,12 @@
             await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
             alert("✅ Successfully Synced!"); 
             items = []; renderScanList();
-            initDateFilter();
+            initFilter();
             if(document.getElementById('adminView').style.display === 'block') loadAdminData();
         }
     };
 
-    // EXPORT ENGINE
+    // EXPORT ENGINE (PDF, Excel, Print)
     window.runExport = (type, data) => {
         const { courier, operator, date, count, awbs } = data;
         if(type === 'print') {
@@ -239,10 +243,9 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid');
-        grid.innerHTML = "<p class='p-5 text-center'>Syncing bucket...</p>";
+        grid.innerHTML = "<p class='p-5 text-center'>Loading Date Bucket...</p>";
         const filterVal = document.getElementById('filterDate').value;
         
-        // Fetch all, then sort/filter locally for absolute accuracy
         const q = query(collection(db, "manifests"), orderBy("time", "desc"));
         const snap = await getDocs(q);
         grid.innerHTML = ""; let vol = 0;
@@ -250,13 +253,12 @@
         snap.forEach(docSnap => {
             const d = docSnap.data();
             const ts = d.time ? d.time.toDate() : new Date();
-            const recordLocalDate = getLocalDateString(ts);
+            const recLocalDate = ts.getFullYear() + '-' + String(ts.getMonth() + 1).padStart(2, '0') + '-' + String(ts.getDate()).padStart(2, '0');
 
-            // Strict date match
-            if (filterVal && recordLocalDate !== filterVal) return;
+            if (filterVal && recLocalDate !== filterVal) return;
 
             vol += d.count;
-            const exportData = JSON.stringify({ courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs });
+            const cardData = JSON.stringify({ courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs });
             
             const col = document.createElement('div');
             col.className = "col-md-4 mb-4";
@@ -267,12 +269,12 @@
                     <p class="small text-muted mb-2">${ts.toLocaleTimeString()} | User: ${d.operator}</p>
                     <div class="d-grid gap-1">
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-dark" onclick='runExport("print", ${exportData})'>Print</button>
-                            <button class="btn btn-sm btn-info text-white" onclick='runExport("pdf", ${exportData})'>PDF</button>
+                            <button class="btn btn-sm btn-dark" onclick='runExport("print", ${cardData})'>Print</button>
+                            <button class="btn btn-sm btn-info text-white" onclick='runExport("pdf", ${cardData})'>PDF</button>
                         </div>
-                        <button class="btn btn-sm btn-success" onclick='runExport("excel", ${exportData})'>Excel Export</button>
-                        <button class="btn btn-sm btn-warning fw-bold" onclick="updateC('${docSnap.id}')">Update Courier Name</button>
-                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${docSnap.id}')" style="cursor:pointer">Delete</a></div>
+                        <button class="btn btn-sm btn-success" onclick='runExport("excel", ${cardData})'>Excel Export</button>
+                        <button class="btn btn-sm btn-warning fw-bold" onclick="updateC('${docSnap.id}')">Update Courier</button>
+                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${docSnap.id}')" style="cursor:pointer">Delete Manifest</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
@@ -281,12 +283,11 @@
     };
 
     window.updateC = async (id) => {
-        const val = document.getElementById(`inp-${id}`).value;
-        await updateDoc(doc(db, "manifests", id), { courier: val });
+        await updateDoc(doc(db, "manifests", id), { courier: document.getElementById(`inp-${id}`).value });
         alert("Courier Name Updated!"); loadAdminData();
     };
 
-    window.deleteRec = async (id) => { if(confirm("Permanently delete?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
+    window.deleteRec = async (id) => { if(confirm("Delete this manifest?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
     window.preparePrintCurrent = () => window.runExport("print", { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items });
     window.downloadExcelUser = () => window.runExport("excel", { courier: document.getElementById('courierType').value || "Manifest", awbs: items });
 </script>
