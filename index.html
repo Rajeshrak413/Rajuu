@@ -112,11 +112,11 @@
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndAlertDanger" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
+<audio id="sndReject" src="https://assets.mixkit.co/active_storage/sfx/950/950-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyCynM9SUrwBGKjzuXuNjnbQERLjnhM4j2k",
@@ -149,8 +149,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndAlertDanger').play();
-                setTimeout(() => alert("🚨 DANGER: DUPLICATE AWB!\nAWB: " + val), 200);
+                document.getElementById('sndReject').play();
+                setTimeout(() => alert("❌ REJECTED: DUPLICATE AWB!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -214,27 +214,42 @@
             col.innerHTML = `
                 <div class="card admin-card p-3 h-100 shadow-sm">
                     <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
-                    <h5 class="text-primary mt-2 fw-bold">${d.courier}</h5>
-                    <p class="small text-muted mb-3">${ts.toLocaleString()}</p>
-                    <div class="d-grid gap-2">
+                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-2" value="${d.courier}" id="edit-cr-${docSnap.id}">
+                    <p class="small text-muted mb-2">Op: ${d.operator} | ${ts.toLocaleString()}</p>
+                    <div class="d-grid gap-1">
                         <div class="btn-group">
                             <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
                             <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
                         </div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy All AWBs</button>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
+                        <button class="btn btn-sm btn-warning" id="up-${docSnap.id}">Update Name</button>
                         <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Manifest</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
             document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, d.courier, ts);
             document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(d.courier, d.operator, ts.toLocaleString(), d.count, d.awbs);
-            document.getElementById(`cp-${docSnap.id}`).onclick = () => {
-                navigator.clipboard.writeText(d.awbs.join('\n'));
-                alert("All AWBs copied to clipboard!");
+            document.getElementById(`up-${docSnap.id}`).onclick = async () => {
+                const newName = document.getElementById(`edit-cr-${docSnap.id}`).value;
+                await updateDoc(doc(db, "manifests", docSnap.id), { courier: newName });
+                alert("Courier name updated!");
             };
+            document.getElementById(`cp-${docSnap.id}`).onclick = () => copyTableToClipboard(d.awbs);
             document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
         });
     };
+
+    function copyTableToClipboard(awbs) {
+        let tableHtml = `<table border="1" style="border-collapse:collapse;"><tr><th>SL</th><th>AWB NUMBER</th></tr>`;
+        awbs.forEach((awb, index) => {
+            tableHtml += `<tr><td style="text-align:center;">${index + 1}</td><td>${awb}</td></tr>`;
+        });
+        tableHtml += `</table>`;
+        
+        const blob = new Blob([tableHtml], { type: 'text/html' });
+        const data = [new ClipboardItem({ 'text/html': blob })];
+        navigator.clipboard.write(data).then(() => alert("Table copied! You can now paste directly into Excel with borders."));
+    }
 </script>
 </body>
 </html>
