@@ -15,10 +15,9 @@
         
         #scannerView, #adminView, #printView { display: none; }
 
-        /* Admin UI */
+        /* Admin Dashboard UI */
         .summary-card { background: #e3f2fd; border-left: 8px solid var(--medika); }
         .admin-card { border-top: 6px solid var(--medika); position: relative; background: white; transition: 0.2s; }
-        .admin-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
         .highlight-find { background: #fff3cd; border: 2px solid #ffc107; }
 
@@ -77,7 +76,7 @@
         <div class="col-lg-5">
             <div class="card p-4 shadow-sm">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier Name (e.g. BlueDart)">
+                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier (e.g. Delhivery)">
                 <label class="fw-bold text-danger d-block text-center">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
                 <div class="d-grid gap-2 mt-4">
@@ -108,7 +107,7 @@
     <div id="adminView">
         <div class="row mb-3 align-items-center">
             <div class="col-md-3">
-                <h4 class="text-primary fw-bold m-0">Admin Dashboard</h4>
+                <h4 class="text-primary fw-bold m-0">Management</h4>
             </div>
             <div class="col-md-6">
                 <div class="input-group">
@@ -123,9 +122,8 @@
         </div>
 
         <div class="card summary-card p-3 mb-4 shadow-sm text-center">
-            <h5 class="m-0 text-uppercase" id="summaryTitle">TOTAL VOLUME</h5>
+            <h5 class="m-0 text-uppercase" id="summaryTitle">VOLUME OVERVIEW</h5>
             <div class="display-4 fw-bold text-primary" id="totalVolumeCount">0</div>
-            <p class="small text-muted mb-0">Filtered parcel count</p>
         </div>
 
         <div id="adminGrid" class="row"></div>
@@ -133,7 +131,7 @@
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndFire" src="https://gfxsounds.com/wp-content/uploads/2023/08/Fire-truck-siren.mp3"></audio>
+<audio id="sndAttention" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -175,8 +173,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndFire').play();
-                setTimeout(() => alert("🚨 FIRE ALERT: DUPLICATE SCAN!\nAWB: " + val), 200);
+                document.getElementById('sndAttention').play();
+                setTimeout(() => alert("🚨 ATTENTION: DUPLICATE AWB!\nNumber: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -188,7 +186,7 @@
 
     function renderScanList() {
         document.getElementById('scanBody').innerHTML = items.map((a, i) => 
-            `<tr><td>${i+1}</td><td class="fw-bold">${a}</td><td><button class="btn btn-sm btn-outline-danger" onclick="window.del(${i})">X</button></td></tr>`
+            `<tr><td>${i+1}</td><td class="fw-bold text-dark">${a}</td><td><button class="btn btn-sm btn-outline-danger" onclick="window.del(${i})">X</button></td></tr>`
         ).join('');
         document.getElementById('totalCount').innerText = items.length;
     }
@@ -212,7 +210,7 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid'); 
-        grid.innerHTML = "<p class='p-5 text-center'>Scanning History...</p>";
+        grid.innerHTML = "<p class='p-5 text-center'>Loading manifests...</p>";
         
         const fDate = document.getElementById('filterDate').value;
         const searchVal = document.getElementById('searchAWB').value.trim();
@@ -222,7 +220,7 @@
         
         let volume = 0;
         let found = false;
-        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME FOR ${fDate}` : "TOTAL VOLUME";
+        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME ON ${fDate}` : "ALL TIME VOLUME";
 
         snap.forEach(docSnap => {
             const d = docSnap.data();
@@ -240,19 +238,19 @@
             col.innerHTML = `
                 <div class="card admin-card p-3 h-100 shadow-sm ${searchVal ? 'highlight-find' : ''}">
                     <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
-                    <input type="text" class="form-control form-control-sm fw-bold mb-1" value="${d.courier}" id="inp-${docSnap.id}" disabled>
-                    <p class="small text-muted mb-2">Op: ${d.operator} | ${ts.toLocaleString()}</p>
+                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-2" value="${d.courier}" id="inp-${docSnap.id}" disabled>
+                    <p class="small text-muted mb-2">User: ${d.operator} | ${ts.toLocaleString()}</p>
                     <div class="d-grid gap-1">
                         <div class="btn-group">
                             <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
                             <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
                         </div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel</button>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
                         <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button>
+                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit Name</button>
                             <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
                         </div>
-                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete</a></div>
+                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Record</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
@@ -264,7 +262,7 @@
             document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, inp.value, ts);
             document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(inp.value, d.operator, ts.toLocaleString(), d.count, d.awbs);
             document.getElementById(`cp-${docSnap.id}`).onclick = () => copyToClipboard(d.awbs);
-            document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
+            document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete Record?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
 
             edtBtn.onclick = () => { inp.disabled = false; edtBtn.classList.add('d-none'); savBtn.classList.remove('d-none'); inp.focus(); };
             savBtn.onclick = async () => {
@@ -303,7 +301,7 @@
         awbs.forEach((a, i) => { h += `<tr><td style="text-align:center;">${i + 1}</td><td>${a}</td></tr>`; });
         h += `</table>`;
         const b = new Blob([h], { type: 'text/html' });
-        navigator.clipboard.write([new ClipboardItem({ 'text/html': b })]).then(() => alert("Table Copied!"));
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': b })]).then(() => alert("Table Copied with SL No and Borders!"));
     }
 </script>
 </body>
