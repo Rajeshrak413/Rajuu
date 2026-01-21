@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Panel | MEDIKA BAZAAR</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --medika: #004a99; --danger: #dc3545; }
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
+        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .scan-input { font-size: 2rem; height: 80px; border: 3px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); }
+        .table-container { max-height: 450px; overflow-y: auto; }
+        #scannerPage { display: none; }
+        
+        @media print { 
+            .no-print { display: none !important; } 
+            #printHead { display: block !important; } 
+            .big-courier { font-size: 80pt !important; font-weight: 900; text-align: center; display: block; margin: 50px 0; text-transform: uppercase; line-height: 1; } 
+        }
+        #printHead { display: none; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="printHead">
+    <h1 style="font-size: 30pt;">MEDIKA BAZAAR</h1>
+    <div class="big-courier" id="p-courier"></div>
+    <hr style="border: 2px solid #000;">
+    <p style="font-size: 18pt;">Operator: <span id="p-op"></span> | Date: <span id="p-date"></span></p>
+</div>
+
+<nav class="navbar no-print mb-4 py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+        <h3 class="m-0">MEDIKA BAZAAR</h3>
+        <button class="btn btn-outline-light btn-sm" onclick="location.href='admin.html'">ADMIN PANEL</button>
+    </div>
+</nav>
+
+<div class="container no-print">
+    <div id="loginPage" class="row justify-content-center mt-5">
+        <div class="col-md-5">
+            <div class="card p-5 text-center">
+                <h2 class="mb-4 text-primary">Logistics Login</h2>
+                <input type="text" id="userName" class="form-control mb-3 p-3" placeholder="Enter Your Name">
+                <button class="btn btn-primary w-100 btn-lg shadow" onclick="startScanner()">ENTER SCANNER</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="scannerPage" class="row g-4">
+        <div class="col-lg-5">
+            <div class="card p-4 shadow-sm position-relative">
+                <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-3" onclick="location.reload()">NEW USER</button>
+                <div class="mb-3 mt-3">
+                    <p class="mb-1 text-muted">Operator: <b id="displayUser" class="text-dark"></b></p>
+                    <label class="form-label fw-bold">Courier Type (Manual Entry)</label>
+                    <input type="text" id="courierType" class="form-control p-2 border-primary" placeholder="e.g. BlueDart, Delhivery">
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-danger">SCAN AWB NUMBER</label>
+                    <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
+                </div>
+                <div class="d-grid gap-2">
+                    <button id="syncBtn" class="btn btn-success btn-lg fw-bold shadow" onclick="syncData()">COMPLETE & SYNC</button>
+                    <div class="row g-2">
+                        <div class="col-6"><button class="btn btn-dark w-100 py-2" onclick="preparePrint()">PRINT</button></div>
+                        <div class="col-6"><button class="btn btn-info text-white w-100 py-2" onclick="downloadExcel()">DOWNLOAD EXCEL</button></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card p-3 shadow-sm h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="m-0 text-primary">Live Manifest</h5>
+                    <span class="badge bg-primary fs-5 px-3">Count: <span id="totalCount">0</span></span>
+                </div>
+                <div class="table-container border rounded">
+                    <table class="table table-hover m-0">
+                        <thead class="table-dark sticky-top">
+                            <tr><th>SL</th><th>AWB Number</th><th class="text-center">Action</th></tr>
+                        </thead>
+                        <tbody id="scanBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
+<audio id="sndDanger" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCynM9SUrwBGKjzuXuNjnbQERLjnhM4j2k",
+        authDomain: "awbscan-49c04.firebaseapp.com",
+        projectId: "awbscan-49c04",
+        storageBucket: "awbscan-49c04.firebasestorage.app",
+        messagingSenderId: "269309952447",
+        appId: "1:269309952447:web:7e0e524b157e7a9904610a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    let items = [];
+
+    window.startScanner = () => {
+        const user = document.getElementById('userName').value.trim();
+        if(!user) return alert("Operator name is required.");
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('scannerPage').style.display = 'flex';
+        document.getElementById('displayUser').innerText = user;
+        document.getElementById('awbInput').focus();
+    };
+
+    const awbIn = document.getElementById('awbInput');
+    awbIn.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const val = awbIn.value.trim();
+            if(!val) return;
+            if (items.includes(val)) {
+                document.getElementById('sndDanger').play();
+                setTimeout(() => alert("🚨 DANGER: DUPLICATE AWB!\nNumber: " + val), 150);
+            } else {
+                document.getElementById('sndScan').play();
+                items.push(val);
+                render();
+            }
+            awbIn.value = '';
+        }
+    });
+
+    function render() {
+        document.getElementById('scanBody').innerHTML = items.map((a, i) => 
+            `<tr><td>${i+1}</td><td class="fw-bold">${a}</td><td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="window.del(${i})">Delete</button></td></tr>`
+        ).join('');
+        document.getElementById('totalCount').innerText = items.length;
+    }
+
+    window.del = (i) => { items.splice(i, 1); render(); };
+
+    window.syncData = async () => {
+        const name = document.getElementById('userName').value;
+        const courier = document.getElementById('courierType').value || "General";
+        if (items.length === 0) return alert("Nothing to sync.");
+        
+        try {
+            document.getElementById('syncBtn').disabled = true;
+            document.getElementById('syncBtn').innerText = "Syncing...";
+            await addDoc(collection(db, "manifests"), {
+                operator: name,
+                courier: courier,
+                awbs: items,
+                count: items.length,
+                time: serverTimestamp()
+            });
+            alert("✅ Synced to Firebase successfully!");
+            items = []; render();
+        } catch (e) { alert("Error: " + e.message); }
+        finally { 
+            document.getElementById('syncBtn').disabled = false; 
+            document.getElementById('syncBtn').innerText = "COMPLETE & SYNC";
+        }
+    };
+
+    window.downloadExcel = () => {
+        if(items.length === 0) return alert("No data to save.");
+        const courier = document.getElementById('courierType').value || "Manifest";
+        const op = document.getElementById('userName').value;
+        const now = new Date();
+        const ts = `${now.getDate()}-${now.getMonth()+1}_${now.getHours()}-${now.getMinutes()}`;
+        
+        const wb = XLSX.utils.book_new();
+        const wsData = [
+            ["MEDIKA BAZAAR LOGISTICS"],
+            ["COURIER TYPE:", courier.toUpperCase()],
+            ["OPERATOR NAME:", op],
+            ["TOTAL SCANS:", items.length],
+            ["DATE:", now.toLocaleString()],
+            [],
+            ["SL NO", "AWB NUMBER"]
+        ];
+        items.forEach((a, i) => wsData.push([i+1, a]));
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "Manifest");
+        // Filename: Courier_Date_Time.xlsx
+        XLSX.writeFile(wb, `Medika_${courier}_${ts}.xlsx`);
+    };
+
+    window.preparePrint = () => {
+        document.getElementById('p-op').innerText = document.getElementById('userName').value;
+        document.getElementById('p-courier').innerText = document.getElementById('courierType').value.toUpperCase() || "GENERAL";
+        document.getElementById('p-date').innerText = new Date().toLocaleString();
+        window.print();
+    };
+</script>
+</body>
+</html>
