@@ -2,91 +2,73 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard | MEDIKA BAZAAR</title>
+    <title>Admin Panel | Medika Bazaar</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        .admin-card { border-left: 6px solid #004a99; transition: 0.3s; }
-        .admin-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .admin-card { border-top: 5px solid #004a99; border-radius: 10px; position: relative; }
+        .awb-count-tag { position: absolute; top: 10px; right: 10px; font-size: 1.2rem; font-weight: bold; }
     </style>
 </head>
 <body class="bg-light">
-
-<nav class="navbar navbar-dark bg-dark px-4 mb-4 shadow">
-    <span class="navbar-brand">MEDIKA BAZAAR ADMIN DASHBOARD</span>
-</nav>
-
-<div class="container">
-    <div id="login" class="card p-4 mx-auto shadow-sm" style="max-width: 400px; margin-top: 100px;">
-        <h4 class="text-center mb-4 text-primary">Admin Access</h4>
-        <input type="password" id="p" class="form-control mb-3 p-3" placeholder="Enter Password (0000)">
-        <button class="btn btn-primary w-100 btn-lg" onclick="auth()">ACCESS RECORDS</button>
+    <nav class="navbar navbar-dark bg-dark px-4 mb-4">
+        <span class="navbar-brand">ADMIN MANAGEMENT</span>
+        <button class="btn btn-sm btn-outline-light" onclick="location.href='index.html'">BACK TO SCANNER</button>
+    </nav>
+    <div class="container">
+        <div id="login" class="card p-4 mx-auto shadow-sm" style="max-width: 350px;">
+            <h5 class="text-center mb-3">Admin Login</h5>
+            <input type="password" id="p" class="form-control mb-3" placeholder="Pass (0000)">
+            <button class="btn btn-primary w-100" onclick="auth()">VIEW ALL RECORDS</button>
+        </div>
+        <div id="viewGrid" class="row d-none"></div>
     </div>
-
-    <div id="dashboard" class="d-none">
-        <h3 class="mb-4">Synced User Data</h3>
-        <div id="dataList" class="row"></div>
-    </div>
-</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyCynM9SUrwBGKjzuXuNjnbQERLjnhM4j2k",
-        authDomain: "awbscan-49c04.firebaseapp.com",
-        projectId: "awbscan-49c04",
-        storageBucket: "awbscan-49c04.firebasestorage.app",
-        messagingSenderId: "269309952447",
-        appId: "1:269309952447:web:7e0e524b157e7a9904610a"
-    };
-
+    const firebaseConfig = { /* Same as index.html config */ };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
     window.auth = () => {
         if(document.getElementById('p').value === "0000") {
             document.getElementById('login').classList.add('d-none');
-            document.getElementById('dashboard').classList.remove('d-none');
-            loadData();
-        } else { alert("Incorrect Admin Password."); }
-    }
+            document.getElementById('viewGrid').classList.remove('d-none');
+            loadRecords();
+        } else { alert("Wrong Password"); }
+    };
 
-    async function loadData() {
+    async function loadRecords() {
         const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "desc")));
-        const list = document.getElementById('dataList');
-        
+        const grid = document.getElementById('viewGrid');
         snap.forEach(doc => {
             const d = doc.data();
-            const time = d.time ? d.time.toDate().toLocaleString() : "Syncing...";
-            list.innerHTML += `
+            grid.innerHTML += `
                 <div class="col-md-4 mb-4">
-                    <div class="card admin-card p-3 shadow-sm bg-white h-100">
-                        <h5 class="text-primary mb-1">${d.courier}</h5>
-                        <p class="small text-muted mb-3">${time}</p>
-                        <p class="mb-3">Operator: <b>${d.operator}</b><br>Scanned: <b>${d.count} AWBs</b></p>
-                        <button class="btn btn-success btn-sm w-100 py-2" onclick='window.downloadSingle(${JSON.stringify(d)})'>Download Individual Excel</button>
+                    <div class="card admin-card p-3 shadow-sm h-100">
+                        <span class="badge bg-danger awb-count-tag">${d.count} AWBs</span>
+                        <h5 class="text-primary mt-2">${d.courier}</h5>
+                        <p class="small text-muted mb-1">User: ${d.operator}</p>
+                        <p class="small text-muted mb-3">${d.time ? d.time.toDate().toLocaleString() : 'Just Now'}</p>
+                        <hr>
+                        <div style="max-height: 150px; overflow-y: auto; font-size: 0.85rem;" class="mb-3">
+                            ${d.awbs.map((a, i) => `<div>${i+1}. ${a}</div>`).join('')}
+                        </div>
+                        <button class="btn btn-sm btn-success w-100" onclick='window.downExcel(${JSON.stringify(d)})'>Download Excel</button>
                     </div>
                 </div>`;
         });
     }
 
-    window.downloadSingle = (d) => {
+    window.downExcel = (d) => {
         const wb = XLSX.utils.book_new();
-        const wsData = [
-            ["MEDIKA BAZAAR LOGISTICS REPORT"],
-            ["Courier:", d.courier],
-            ["Operator:", d.operator],
-            ["Original Sync Time:", d.time ? new Date(d.time.seconds * 1000).toLocaleString() : "N/A"],
-            [],
-            ["SL", "AWB NUMBER"]
-        ];
+        const wsData = [["MEDIKA BAZAAR LOGISTICS"], ["Courier:", d.courier], ["User:", d.operator], ["AWB Count:", d.count], [], ["SL", "AWB NUMBER"]];
         d.awbs.forEach((a, i) => wsData.push([i+1, a]));
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, "Manifest");
-        XLSX.writeFile(wb, `${d.courier}_${d.operator}.xlsx`);
-    }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Report");
+        XLSX.writeFile(wb, `Admin_${d.courier}_${d.operator}.xlsx`);
+    };
 </script>
 </body>
 </html>
