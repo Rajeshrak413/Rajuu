@@ -21,7 +21,7 @@
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
         .highlight-find { background: #fff3cd; border: 2px solid #ffc107; }
 
-        /* PRINT LAYOUT (2-Column Circle Count) */
+        /* PRINT LAYOUT */
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
@@ -76,7 +76,7 @@
         <div class="col-lg-5">
             <div class="card p-4 shadow-sm">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier (e.g. BlueDart)">
+                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier Name">
                 <label class="fw-bold text-danger d-block text-center">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
                 <div class="d-grid gap-2 mt-4">
@@ -125,7 +125,7 @@
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndIndustrial" src="https://assets.mixkit.co/active_storage/sfx/2242/2242-preview.mp3"></audio>
+<audio id="sndFire" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -166,8 +166,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndIndustrial').play();
-                setTimeout(() => alert("🚨 DANGER: DUPLICATE SCAN!\nAWB: " + val), 200);
+                document.getElementById('sndFire').play();
+                setTimeout(() => alert("🚨 FIRE ALERT: DUPLICATE AWB!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -186,7 +186,7 @@
     window.del = (i) => { items.splice(i, 1); renderScanList(); };
 
     window.syncData = async () => {
-        if (items.length === 0) return alert("No scans to sync");
+        if (items.length === 0) return alert("No data scanned");
         const cr = document.getElementById('courierType').value || "N/A";
         try {
             document.getElementById('syncBtn').disabled = true;
@@ -203,11 +203,10 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid'); 
-        grid.innerHTML = "<p class='p-5 text-center'>Loading records...</p>";
+        grid.innerHTML = "<p class='p-5 text-center'>Scanning History...</p>";
         const fDate = document.getElementById('filterDate').value;
         const searchVal = document.getElementById('searchAWB').value.trim();
-        const q = query(collection(db, "manifests"), orderBy("time", "desc"));
-        const snap = await getDocs(q);
+        const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "desc")));
         grid.innerHTML = "";
         let vol = 0; let found = false;
         document.getElementById('summaryTitle').innerText = fDate ? `VOLUME FOR ${fDate}` : "TOTAL VOLUME";
@@ -225,19 +224,19 @@
             col.innerHTML = `
                 <div class="card admin-card p-3 h-100 shadow-sm ${searchVal ? 'highlight-find' : ''}">
                     <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
-                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-2" value="${d.courier}" id="inp-${docSnap.id}" disabled>
+                    <input type="text" class="form-control form-control-sm fw-bold mb-1" value="${d.courier}" id="inp-${docSnap.id}" disabled>
                     <p class="small text-muted mb-2">User: ${d.operator} | ${ts.toLocaleString()}</p>
                     <div class="d-grid gap-1">
                         <div class="btn-group">
                             <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
                             <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
                         </div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel</button>
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button>
                             <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
                         </div>
-                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Manifest</a></div>
+                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Record</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
@@ -257,7 +256,7 @@
             };
         });
         document.getElementById('totalVolumeCount').innerText = vol;
-        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No matching records found.</p>";
+        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No matching records.</p>";
     };
 
     function saveExcel(list, op, cr, dObj) {
@@ -285,8 +284,8 @@
         let h = `<table border="1" style="border-collapse:collapse;"><tr><th>SL</th><th>AWB NUMBER</th></tr>`;
         awbs.forEach((a, i) => { h += `<tr><td style="text-align:center;">${i + 1}</td><td>${a}</td></tr>`; });
         h += `</table>`;
-        const blob = new Blob([h], { type: 'text/html' });
-        navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]).then(() => alert("Table Copied with Borders!"));
+        const b = new Blob([h], { type: 'text/html' });
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': b })]).then(() => alert("Formatted Table Copied!"));
     }
 </script>
 </body>
