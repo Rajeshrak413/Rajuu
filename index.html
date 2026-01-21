@@ -15,7 +15,7 @@
         
         #scannerView, #adminView, #printView { display: none; }
 
-        /* Admin Dashboard UI */
+        /* Admin UI */
         .summary-card { background: #e3f2fd; border-left: 8px solid var(--medika); }
         .admin-card { border-top: 6px solid var(--medika); position: relative; background: white; transition: 0.2s; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
@@ -76,7 +76,7 @@
         <div class="col-lg-5">
             <div class="card p-4 shadow-sm">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier Name (e.g. Delhivery)">
+                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier Name (e.g. BlueDart)">
                 <label class="fw-bold text-danger d-block text-center">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
                 <div class="d-grid gap-2 mt-4">
@@ -106,9 +106,7 @@
 
     <div id="adminView">
         <div class="row mb-3 align-items-center">
-            <div class="col-md-3">
-                <h4 class="text-primary fw-bold m-0">Management</h4>
-            </div>
+            <div class="col-md-3"><h4 class="text-primary fw-bold m-0">Management</h4></div>
             <div class="col-md-6">
                 <div class="input-group">
                     <input type="text" id="searchAWB" class="form-control border-primary" placeholder="Search AWB..." oninput="loadAdminData()">
@@ -116,22 +114,18 @@
                     <button class="btn btn-outline-primary" onclick="clearFilters()">Reset</button>
                 </div>
             </div>
-            <div class="col-md-3 text-end">
-                <button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button>
-            </div>
+            <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button></div>
         </div>
-
         <div class="card summary-card p-3 mb-4 shadow-sm text-center">
             <h5 class="m-0 text-uppercase" id="summaryTitle">VOLUME OVERVIEW</h5>
             <div class="display-4 fw-bold text-primary" id="totalVolumeCount">0</div>
         </div>
-
         <div id="adminGrid" class="row"></div>
     </div>
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndFire" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
+<audio id="sndDanger" src="https://assets.mixkit.co/active_storage/sfx/2242/2242-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -172,8 +166,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndFire').play();
-                setTimeout(() => alert("🚨 FIRE ALERT: DUPLICATE SCAN!\nAWB: " + val), 200);
+                document.getElementById('sndDanger').play();
+                setTimeout(() => alert("🚨 DANGER: DUPLICATE AWB!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -191,37 +185,19 @@
     }
     window.del = (i) => { items.splice(i, 1); renderScanList(); };
 
-    // CONFIRMATION DIALOG BEFORE SYNC
     window.confirmSync = async () => {
         if (items.length === 0) return alert("No scans to sync.");
         const cr = document.getElementById('courierType').value || "GENERAL";
-        
-        const isConfirmed = confirm(`PLEASE CONFIRM MANIFEST:\n\nCourier: ${cr}\nTotal AWBs: ${items.length}\n\nDo you want to upload this to the cloud?`);
-        
-        if (isConfirmed) {
-            await syncData(cr);
-        }
+        const isConfirmed = confirm(`MANIFST SUMMARY:\nCourier: ${cr}\nTotal Count: ${items.length}\n\nSync to cloud now?`);
+        if (isConfirmed) await syncData(cr);
     };
 
     async function syncData(cr) {
         try {
             document.getElementById('syncBtn').disabled = true;
-            await addDoc(collection(db, "manifests"), { 
-                operator: opName, 
-                courier: cr, 
-                awbs: items, 
-                count: items.length, 
-                time: serverTimestamp() 
-            });
-            alert("✅ Manifest Sync Successful!"); 
-            items = []; 
-            renderScanList();
-            document.getElementById('courierType').value = "";
-        } catch (e) { 
-            alert("Sync Error: " + e.message); 
-        } finally { 
-            document.getElementById('syncBtn').disabled = false; 
-        }
+            await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
+            alert("✅ Synced Successfully!"); items = []; renderScanList(); document.getElementById('courierType').value = "";
+        } catch (e) { alert(e.message); } finally { document.getElementById('syncBtn').disabled = false; }
     }
 
     window.clearFilters = () => {
@@ -232,13 +208,13 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid'); 
-        grid.innerHTML = "<p class='p-5 text-center'>Loading History...</p>";
+        grid.innerHTML = "<p class='p-5 text-center'>Scanning History...</p>";
         const fDate = document.getElementById('filterDate').value;
         const searchVal = document.getElementById('searchAWB').value.trim();
         const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "desc")));
         grid.innerHTML = "";
         let vol = 0; let found = false;
-        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME FOR ${fDate}` : "TOTAL VOLUME";
+        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME ON ${fDate}` : "ALL TIME VOLUME";
 
         snap.forEach(docSnap => {
             const d = docSnap.data();
@@ -253,19 +229,13 @@
             col.innerHTML = `
                 <div class="card admin-card p-3 h-100 shadow-sm ${searchVal ? 'highlight-find' : ''}">
                     <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
-                    <input type="text" class="form-control form-control-sm fw-bold mb-1" value="${d.courier}" id="inp-${docSnap.id}" disabled>
-                    <p class="small text-muted mb-2">User: ${d.operator} | ${ts.toLocaleString()}</p>
+                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-2" value="${d.courier}" id="inp-${docSnap.id}" disabled>
+                    <p class="small text-muted mb-2">Op: ${d.operator} | ${ts.toLocaleString()}</p>
                     <div class="d-grid gap-1">
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
-                            <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
-                        </div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel</button>
-                        <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button>
-                            <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
-                        </div>
-                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete</a></div>
+                        <div class="btn-group"><button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button><button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button></div>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
+                        <div class="d-flex gap-1"><button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button><button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button></div>
+                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Manifest</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
@@ -285,7 +255,7 @@
             };
         });
         document.getElementById('totalVolumeCount').innerText = vol;
-        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No matching records.</p>";
+        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No results found.</p>";
     };
 
     function saveExcel(list, op, cr, dObj) {
