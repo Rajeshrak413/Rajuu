@@ -15,10 +15,12 @@
         
         #scannerView, #adminView, #printView { display: none; }
 
-        /* Admin Dashboard UI */
-        .admin-card { border-top: 6px solid var(--medika); position: relative; background: white; }
+        /* Admin UI */
+        .summary-card { background: #e3f2fd; border-left: 8px solid var(--medika); }
+        .admin-card { border-top: 6px solid var(--medika); position: relative; background: white; transition: 0.2s; }
+        .admin-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
-        .edit-active { border: 2px dashed var(--edit) !important; background: #fffdf5 !important; }
+        .highlight-find { background: #fff3cd; border: 2px solid #ffc107; }
 
         /* CIRCLE & SPLIT PRINT LAYOUT */
         @media print {
@@ -56,7 +58,7 @@
 <nav class="navbar py-3 no-print shadow">
     <div class="container d-flex justify-content-between">
         <h3 class="m-0 font-weight-bold">MEDIKA BAZAAR</h3>
-        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">HOME / LOGOUT</button>
+        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT / HOME</button>
     </div>
 </nav>
 
@@ -64,7 +66,7 @@
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5">
             <div class="card p-5 text-center shadow">
-                <h2 class="mb-4 text-primary font-weight-bold">Logistics Login</h2>
+                <h2 class="mb-4 text-primary font-weight-bold">System Login</h2>
                 <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
                 <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS SYSTEM</button>
             </div>
@@ -104,16 +106,34 @@
     </div>
 
     <div id="adminView">
-        <div class="d-flex justify-content-between mb-4 align-items-center">
-            <h3 class="text-primary fw-bold m-0">Admin Dashboard</h3>
-            <button class="btn btn-primary" onclick="loadAdminData()">Refresh Data</button>
+        <div class="row mb-3 align-items-center">
+            <div class="col-md-3">
+                <h4 class="text-primary fw-bold m-0">Admin Dashboard</h4>
+            </div>
+            <div class="col-md-6">
+                <div class="input-group">
+                    <input type="text" id="searchAWB" class="form-control border-primary" placeholder="Search AWB..." oninput="loadAdminData()">
+                    <input type="date" id="filterDate" class="form-control border-primary" onchange="loadAdminData()">
+                    <button class="btn btn-outline-primary" onclick="clearFilters()">Reset</button>
+                </div>
+            </div>
+            <div class="col-md-3 text-end">
+                <button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button>
+            </div>
         </div>
+
+        <div class="card summary-card p-3 mb-4 shadow-sm text-center">
+            <h5 class="m-0 text-uppercase" id="summaryTitle">TOTAL VOLUME</h5>
+            <div class="display-4 fw-bold text-primary" id="totalVolumeCount">0</div>
+            <p class="small text-muted mb-0">Filtered parcel count</p>
+        </div>
+
         <div id="adminGrid" class="row"></div>
     </div>
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndEmergency" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+<audio id="sndFire" src="https://gfxsounds.com/wp-content/uploads/2023/08/Fire-truck-siren.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -134,6 +154,8 @@
     let opName = "";
     let isScannerActive = false;
 
+    document.getElementById('filterDate').valueAsDate = new Date();
+
     window.keepFocus = () => { if(isScannerActive) document.getElementById('awbInput').focus(); };
 
     window.handleLogin = () => {
@@ -153,8 +175,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndEmergency').play();
-                setTimeout(() => alert("🚨 EMERGENCY: DUPLICATE AWB!\nAWB: " + val), 200);
+                document.getElementById('sndFire').play();
+                setTimeout(() => alert("🚨 FIRE ALERT: DUPLICATE SCAN!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -178,21 +200,90 @@
         try {
             document.getElementById('syncBtn').disabled = true;
             await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
-            alert("✅ Synced Successfully!"); items = []; renderScanList();
+            alert("✅ Synced!"); items = []; renderScanList();
         } catch (e) { alert(e.message); } finally { document.getElementById('syncBtn').disabled = false; }
+    };
+
+    window.clearFilters = () => {
+        document.getElementById('filterDate').value = "";
+        document.getElementById('searchAWB').value = "";
+        loadAdminData();
+    };
+
+    window.loadAdminData = async () => {
+        const grid = document.getElementById('adminGrid'); 
+        grid.innerHTML = "<p class='p-5 text-center'>Scanning History...</p>";
+        
+        const fDate = document.getElementById('filterDate').value;
+        const searchVal = document.getElementById('searchAWB').value.trim();
+        const q = query(collection(db, "manifests"), orderBy("time", "desc"));
+        const snap = await getDocs(q);
+        grid.innerHTML = "";
+        
+        let volume = 0;
+        let found = false;
+        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME FOR ${fDate}` : "TOTAL VOLUME";
+
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            const ts = d.time ? d.time.toDate() : new Date();
+            const recDate = ts.toISOString().split('T')[0];
+
+            if (fDate && recDate !== fDate) return;
+            if (searchVal && !d.awbs.some(a => a.includes(searchVal))) return;
+
+            found = true;
+            volume += d.count;
+
+            const col = document.createElement('div');
+            col.className = "col-md-4 mb-4";
+            col.innerHTML = `
+                <div class="card admin-card p-3 h-100 shadow-sm ${searchVal ? 'highlight-find' : ''}">
+                    <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
+                    <input type="text" class="form-control form-control-sm fw-bold mb-1" value="${d.courier}" id="inp-${docSnap.id}" disabled>
+                    <p class="small text-muted mb-2">Op: ${d.operator} | ${ts.toLocaleString()}</p>
+                    <div class="d-grid gap-1">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
+                            <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel</button>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button>
+                            <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
+                        </div>
+                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete</a></div>
+                    </div>
+                </div>`;
+            grid.appendChild(col);
+
+            const inp = document.getElementById(`inp-${docSnap.id}`);
+            const edtBtn = document.getElementById(`edt-${docSnap.id}`);
+            const savBtn = document.getElementById(`sav-${docSnap.id}`);
+
+            document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, inp.value, ts);
+            document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(inp.value, d.operator, ts.toLocaleString(), d.count, d.awbs);
+            document.getElementById(`cp-${docSnap.id}`).onclick = () => copyToClipboard(d.awbs);
+            document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
+
+            edtBtn.onclick = () => { inp.disabled = false; edtBtn.classList.add('d-none'); savBtn.classList.remove('d-none'); inp.focus(); };
+            savBtn.onclick = async () => {
+                await updateDoc(doc(db, "manifests", docSnap.id), { courier: inp.value.trim() });
+                inp.disabled = true; savBtn.classList.add('d-none'); edtBtn.classList.remove('d-none');
+                alert("Updated!");
+            };
+        });
+        document.getElementById('totalVolumeCount').innerText = volume;
+        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No matching records.</p>";
     };
 
     function saveExcel(list, op, cr, dObj) {
         const wb = XLSX.utils.book_new();
         const wsData = [["MEDIKA BAZAAR"],["COURIER:", cr],["OPERATOR:", op],["COUNT:", list.length],["DATE:", dObj.toLocaleString()],[],["SL", "AWB NUMBER"]];
         list.forEach((a, i) => wsData.push([i+1, a]));
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, "Manifest");
-        const ts = `${dObj.getDate().toString().padStart(2, '0')}-${(dObj.getMonth()+1).toString().padStart(2, '0')}`;
-        XLSX.writeFile(wb, `${cr}_${ts}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
+        XLSX.writeFile(wb, `${cr}_${dObj.getDate()}-${dObj.getMonth()+1}.xlsx`);
     }
-
-    window.downloadExcelUser = () => saveExcel(items, opName, document.getElementById('courierType').value || "Manifest", new Date());
 
     function runPrint(cr, op, date, count, awbs) {
         document.getElementById('p-courier').innerText = cr.toUpperCase();
@@ -205,81 +296,14 @@
         window.print();
     }
 
-    window.preparePrintCurrent = () => {
-        if(items.length === 0) return alert("Empty");
-        runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
-    }
+    window.preparePrintCurrent = () => runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
 
-    window.loadAdminData = async () => {
-        const grid = document.getElementById('adminGrid'); grid.innerHTML = "Loading history...";
-        const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "desc")));
-        grid.innerHTML = "";
-        snap.forEach(docSnap => {
-            const d = docSnap.data();
-            const ts = d.time ? d.time.toDate() : new Date();
-            const col = document.createElement('div');
-            col.className = "col-md-4 mb-4";
-            col.innerHTML = `
-                <div class="card admin-card p-3 h-100 shadow-sm" id="card-${docSnap.id}">
-                    <span class="badge bg-danger awb-count-badge shadow-sm">${d.count}</span>
-                    <div class="mb-2">
-                        <label class="small text-muted fw-bold">Courier Name</label>
-                        <input type="text" class="form-control form-control-sm fw-bold border-secondary mb-1" value="${d.courier}" id="inp-${docSnap.id}" disabled>
-                    </div>
-                    <p class="small text-muted mb-2">Op: ${d.operator} | ${ts.toLocaleString()}</p>
-                    <div class="d-grid gap-1">
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
-                            <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
-                        </div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
-                        <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit Mode</button>
-                            <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save Update</button>
-                        </div>
-                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Record</a></div>
-                    </div>
-                </div>`;
-            grid.appendChild(col);
-
-            const inp = document.getElementById(`inp-${docSnap.id}`);
-            const edtBtn = document.getElementById(`edt-${docSnap.id}`);
-            const savBtn = document.getElementById(`sav-${docSnap.id}`);
-
-            document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, inp.value, ts);
-            document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(inp.value, d.operator, ts.toLocaleString(), d.count, d.awbs);
-            document.getElementById(`cp-${docSnap.id}`).onclick = () => copyTableToClipboard(d.awbs);
-            document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete Manifest?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
-
-            edtBtn.onclick = () => {
-                inp.disabled = false;
-                inp.classList.add('edit-active');
-                edtBtn.classList.add('d-none');
-                savBtn.classList.remove('d-none');
-                inp.focus();
-            };
-
-            savBtn.onclick = async () => {
-                const newName = inp.value.trim();
-                await updateDoc(doc(db, "manifests", docSnap.id), { courier: newName });
-                inp.disabled = true;
-                inp.classList.remove('edit-active');
-                savBtn.classList.add('d-none');
-                edtBtn.classList.remove('d-none');
-                alert("Courier name updated!");
-            };
-        });
-    };
-
-    function copyTableToClipboard(awbs) {
-        let tableHtml = `<table border="1" style="border-collapse:collapse;"><tr><th>SL</th><th>AWB NUMBER</th></tr>`;
-        awbs.forEach((awb, index) => {
-            tableHtml += `<tr><td style="text-align:center;">${index + 1}</td><td>${awb}</td></tr>`;
-        });
-        tableHtml += `</table>`;
-        const blob = new Blob([tableHtml], { type: 'text/html' });
-        const data = [new ClipboardItem({ 'text/html': blob })];
-        navigator.clipboard.write(data).then(() => alert("Table Copied with Borders!"));
+    function copyToClipboard(awbs) {
+        let h = `<table border="1" style="border-collapse:collapse;"><tr><th>SL</th><th>AWB NUMBER</th></tr>`;
+        awbs.forEach((a, i) => { h += `<tr><td style="text-align:center;">${i + 1}</td><td>${a}</td></tr>`; });
+        h += `</table>`;
+        const b = new Blob([h], { type: 'text/html' });
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': b })]).then(() => alert("Table Copied!"));
     }
 </script>
 </body>
