@@ -35,7 +35,7 @@
         }
     </style>
 </head>
-<body>
+<body onclick="keepFocus()">
 
 <div id="printView">
     <h3 style="text-align: center; margin: 0; letter-spacing: 3px;">MEDIKA BAZAAR</h3>
@@ -64,7 +64,7 @@
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5">
             <div class="card p-5 text-center shadow">
-                <h2 class="mb-4 text-primary font-weight-bold">System Login</h2>
+                <h2 class="mb-4 text-primary font-weight-bold">Logistics Login</h2>
                 <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
                 <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS SYSTEM</button>
             </div>
@@ -113,7 +113,7 @@
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndReject" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
+<audio id="sndEmergency" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -132,12 +132,15 @@
     const db = getFirestore(app);
     let items = [];
     let opName = "";
+    let isScannerActive = false;
+
+    window.keepFocus = () => { if(isScannerActive) document.getElementById('awbInput').focus(); };
 
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
         if(!val) return alert("Enter Name");
         if(val === "0000") { showState('adminView'); loadAdminData(); }
-        else { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); document.getElementById('awbInput').focus(); }
+        else { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); isScannerActive = true; document.getElementById('awbInput').focus(); }
     };
 
     function showState(id) {
@@ -150,8 +153,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndReject').play();
-                setTimeout(() => alert("🚨 REJECTED: DUPLICATE SCAN!\nAWB: " + val), 200);
+                document.getElementById('sndEmergency').play();
+                setTimeout(() => alert("🚨 EMERGENCY: DUPLICATE AWB!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -229,10 +232,10 @@
                             <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
                             <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
                         </div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel</button>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit Mode</button>
-                            <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
+                            <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save Update</button>
                         </div>
                         <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Record</a></div>
                     </div>
@@ -243,13 +246,11 @@
             const edtBtn = document.getElementById(`edt-${docSnap.id}`);
             const savBtn = document.getElementById(`sav-${docSnap.id}`);
 
-            // EXCEL & PRINT USE THE CURRENT (possibly updated) DATA
             document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, inp.value, ts);
             document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(inp.value, d.operator, ts.toLocaleString(), d.count, d.awbs);
             document.getElementById(`cp-${docSnap.id}`).onclick = () => copyTableToClipboard(d.awbs);
             document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete Manifest?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
 
-            // EDIT MODE TOGGLE
             edtBtn.onclick = () => {
                 inp.disabled = false;
                 inp.classList.add('edit-active');
@@ -258,7 +259,6 @@
                 inp.focus();
             };
 
-            // SAVE UPDATE
             savBtn.onclick = async () => {
                 const newName = inp.value.trim();
                 await updateDoc(doc(db, "manifests", docSnap.id), { courier: newName });
@@ -266,7 +266,7 @@
                 inp.classList.remove('edit-active');
                 savBtn.classList.add('d-none');
                 edtBtn.classList.remove('d-none');
-                alert("Courier name updated on Cloud!");
+                alert("Courier name updated!");
             };
         });
     };
@@ -279,7 +279,7 @@
         tableHtml += `</table>`;
         const blob = new Blob([tableHtml], { type: 'text/html' });
         const data = [new ClipboardItem({ 'text/html': blob })];
-        navigator.clipboard.write(data).then(() => alert("Formatted Table Copied!"));
+        navigator.clipboard.write(data).then(() => alert("Table Copied with Borders!"));
     }
 </script>
 </body>
