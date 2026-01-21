@@ -24,9 +24,9 @@
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
             #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-            .big-courier { font-size: 80pt !important; font-weight: 900; text-align: center; display: block; margin: 30px 0; text-transform: uppercase; }
+            .big-courier { font-size: 80pt !important; font-weight: 900; text-align: center; display: block; margin: 30px 0; text-transform: uppercase; line-height: 1; }
             .print-table { width: 100%; border-collapse: collapse; }
-            .print-table th, .print-table td { border: 1px solid black !important; padding: 10px; }
+            .print-table th, .print-table td { border: 1px solid black !important; padding: 10px; font-size: 14pt; }
         }
     </style>
 </head>
@@ -80,7 +80,7 @@
                 <div class="d-grid gap-2">
                     <button id="syncBtn" class="btn btn-success btn-lg fw-bold shadow" onclick="syncData()">COMPLETE & SYNC</button>
                     <div class="row g-2">
-                        <div class="col-6"><button class="btn btn-dark w-100 py-2" onclick="preparePrint()">PRINT</button></div>
+                        <div class="col-6"><button class="btn btn-dark w-100 py-2" onclick="preparePrintCurrent()">PRINT</button></div>
                         <div class="col-6"><button class="btn btn-info text-white w-100 py-2" onclick="downloadExcelUser()">EXCEL</button></div>
                     </div>
                 </div>
@@ -106,8 +106,11 @@
 
     <div id="adminView">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="text-primary fw-bold">Admin Dashboard <small class="text-muted fs-6">(Latest First)</small></h3>
-            <button class="btn btn-primary shadow-sm" onclick="loadAdminData()">Refresh Database</button>
+            <h3 class="text-primary fw-bold">Admin Dashboard</h3>
+            <div>
+                <button class="btn btn-primary shadow-sm me-2" onclick="loadAdminData()">Refresh</button>
+                <button class="btn btn-danger shadow-sm" onclick="location.reload()">Logout</button>
+            </div>
         </div>
         <div id="adminGrid" class="row"></div>
     </div>
@@ -137,8 +140,6 @@
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
         if(!val) return alert("Enter Name to access.");
-        
-        // Admin access check (Hidden password)
         if(val === "0000") {
             showState('adminView');
             loadAdminData();
@@ -203,13 +204,11 @@
         awbList.forEach((a, i) => wsData.push([i+1, a]));
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         XLSX.utils.book_append_sheet(wb, ws, "Manifest");
-
         const d = dateObj.getDate().toString().padStart(2, '0');
         const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
         const y = dateObj.getFullYear();
         const h = dateObj.getHours().toString().padStart(2, '0');
         const min = dateObj.getMinutes().toString().padStart(2, '0');
-        
         XLSX.writeFile(wb, `${cr}_${d}-${m}-${y}_${h}-${min}.xlsx`);
     }
 
@@ -218,15 +217,20 @@
         saveExcel(items, opName, document.getElementById('courierType').value || "Manifest", new Date());
     }
 
-    window.preparePrint = () => {
-        const cr = document.getElementById('courierType').value || "GENERAL";
+    // Shared Print function
+    function runPrint(cr, op, date, count, awbs) {
         document.getElementById('p-courier').innerText = cr.toUpperCase();
-        document.getElementById('p-op').innerText = opName;
-        document.getElementById('p-date').innerText = new Date().toLocaleString();
-        document.getElementById('p-count').innerText = items.length;
-        document.getElementById('p-body').innerHTML = items.map((a, i) => `<tr><td>${i+1}</td><td>${a}</td></tr>`).join('');
+        document.getElementById('p-op').innerText = op;
+        document.getElementById('p-date').innerText = date;
+        document.getElementById('p-count').innerText = count;
+        document.getElementById('p-body').innerHTML = awbs.map((a, i) => `<tr><td>${i+1}</td><td>${a}</td></tr>`).join('');
         window.print();
-    };
+    }
+
+    window.preparePrintCurrent = () => {
+        if(items.length === 0) return alert("Nothing to print");
+        runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
+    }
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid');
@@ -247,14 +251,20 @@
                     <p class="small text-muted mb-1">User: ${d.operator}</p>
                     <p class="small text-muted mb-3">Sync: ${timestamp.toLocaleString()}</p>
                     <hr>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <a class="btn-delete-record" id="del-${docSnap.id}">Delete Record</a>
-                        <button class="btn btn-sm btn-success px-4 fw-bold" id="dl-${docSnap.id}">EXCEL</button>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-sm btn-dark px-3" id="pr-${docSnap.id}">Print Manifest</button>
+                            <button class="btn btn-sm btn-success px-3" id="dl-${docSnap.id}">Excel</button>
+                        </div>
+                        <div class="text-center mt-1">
+                            <a class="btn-delete-record" id="del-${docSnap.id}">Delete Record</a>
+                        </div>
                     </div>
                 </div>`;
             grid.appendChild(card);
             
             document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, d.courier, timestamp);
+            document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(d.courier, d.operator, timestamp.toLocaleString(), d.count, d.awbs);
             document.getElementById(`del-${docSnap.id}`).onclick = async () => {
                 if(confirm("Delete this record permanently?")) {
                     await deleteDoc(doc(db, "manifests", docSnap.id));
