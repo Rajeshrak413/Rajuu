@@ -15,13 +15,13 @@
         
         #scannerView, #adminView, #printView { display: none; }
 
-        /* Admin Dashboard UI */
+        /* Admin UI */
         .summary-card { background: #e3f2fd; border-left: 8px solid var(--medika); }
         .admin-card { border-top: 6px solid var(--medika); position: relative; background: white; transition: 0.2s; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
         .highlight-find { background: #fff3cd; border: 2px solid #ffc107; }
 
-        /* CIRCLE & SPLIT PRINT LAYOUT */
+        /* PRINT LAYOUT (2-Column Circle Count) */
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
@@ -65,8 +65,8 @@
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5">
             <div class="card p-5 text-center shadow">
-                <h2 class="mb-4 text-primary font-weight-bold">System Login</h2>
-                <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
+                <h2 class="mb-4 text-primary font-weight-bold">Warehouse Portal</h2>
+                <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Operator Name">
                 <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS SYSTEM</button>
             </div>
         </div>
@@ -76,7 +76,7 @@
         <div class="col-lg-5">
             <div class="card p-4 shadow-sm">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier (e.g. Delhivery)">
+                <input type="text" id="courierType" class="form-control mb-3" placeholder="Courier (e.g. BlueDart)">
                 <label class="fw-bold text-danger d-block text-center">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off">
                 <div class="d-grid gap-2 mt-4">
@@ -106,9 +106,7 @@
 
     <div id="adminView">
         <div class="row mb-3 align-items-center">
-            <div class="col-md-3">
-                <h4 class="text-primary fw-bold m-0">Management</h4>
-            </div>
+            <div class="col-md-3"><h4 class="text-primary fw-bold m-0">Management</h4></div>
             <div class="col-md-6">
                 <div class="input-group">
                     <input type="text" id="searchAWB" class="form-control border-primary" placeholder="Search AWB..." oninput="loadAdminData()">
@@ -116,22 +114,18 @@
                     <button class="btn btn-outline-primary" onclick="clearFilters()">Reset</button>
                 </div>
             </div>
-            <div class="col-md-3 text-end">
-                <button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button>
-            </div>
+            <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button></div>
         </div>
-
         <div class="card summary-card p-3 mb-4 shadow-sm text-center">
             <h5 class="m-0 text-uppercase" id="summaryTitle">VOLUME OVERVIEW</h5>
             <div class="display-4 fw-bold text-primary" id="totalVolumeCount">0</div>
         </div>
-
         <div id="adminGrid" class="row"></div>
     </div>
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndAttention" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
+<audio id="sndIndustrial" src="https://assets.mixkit.co/active_storage/sfx/2242/2242-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -153,7 +147,6 @@
     let isScannerActive = false;
 
     document.getElementById('filterDate').valueAsDate = new Date();
-
     window.keepFocus = () => { if(isScannerActive) document.getElementById('awbInput').focus(); };
 
     window.handleLogin = () => {
@@ -173,8 +166,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndAttention').play();
-                setTimeout(() => alert("🚨 ATTENTION: DUPLICATE AWB!\nNumber: " + val), 200);
+                document.getElementById('sndIndustrial').play();
+                setTimeout(() => alert("🚨 DANGER: DUPLICATE SCAN!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -186,7 +179,7 @@
 
     function renderScanList() {
         document.getElementById('scanBody').innerHTML = items.map((a, i) => 
-            `<tr><td>${i+1}</td><td class="fw-bold text-dark">${a}</td><td><button class="btn btn-sm btn-outline-danger" onclick="window.del(${i})">X</button></td></tr>`
+            `<tr><td>${i+1}</td><td class="fw-bold">${a}</td><td><button class="btn btn-sm btn-outline-danger" onclick="window.del(${i})">X</button></td></tr>`
         ).join('');
         document.getElementById('totalCount').innerText = items.length;
     }
@@ -198,7 +191,7 @@
         try {
             document.getElementById('syncBtn').disabled = true;
             await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
-            alert("✅ Synced!"); items = []; renderScanList();
+            alert("✅ Synced Successfully!"); items = []; renderScanList();
         } catch (e) { alert(e.message); } finally { document.getElementById('syncBtn').disabled = false; }
     };
 
@@ -210,28 +203,22 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid'); 
-        grid.innerHTML = "<p class='p-5 text-center'>Loading manifests...</p>";
-        
+        grid.innerHTML = "<p class='p-5 text-center'>Loading records...</p>";
         const fDate = document.getElementById('filterDate').value;
         const searchVal = document.getElementById('searchAWB').value.trim();
         const q = query(collection(db, "manifests"), orderBy("time", "desc"));
         const snap = await getDocs(q);
         grid.innerHTML = "";
-        
-        let volume = 0;
-        let found = false;
-        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME ON ${fDate}` : "ALL TIME VOLUME";
+        let vol = 0; let found = false;
+        document.getElementById('summaryTitle').innerText = fDate ? `VOLUME FOR ${fDate}` : "TOTAL VOLUME";
 
         snap.forEach(docSnap => {
             const d = docSnap.data();
             const ts = d.time ? d.time.toDate() : new Date();
             const recDate = ts.toISOString().split('T')[0];
-
             if (fDate && recDate !== fDate) return;
             if (searchVal && !d.awbs.some(a => a.includes(searchVal))) return;
-
-            found = true;
-            volume += d.count;
+            found = true; vol += d.count;
 
             const col = document.createElement('div');
             col.className = "col-md-4 mb-4";
@@ -247,23 +234,21 @@
                         </div>
                         <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel (Borders)</button>
                         <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit Name</button>
+                            <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button>
                             <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
                         </div>
-                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Record</a></div>
+                        <div class="text-center mt-2"><a class="text-danger small fw-bold" id="del-${docSnap.id}" style="cursor:pointer">Delete Manifest</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
-
             const inp = document.getElementById(`inp-${docSnap.id}`);
             const edtBtn = document.getElementById(`edt-${docSnap.id}`);
             const savBtn = document.getElementById(`sav-${docSnap.id}`);
 
             document.getElementById(`dl-${docSnap.id}`).onclick = () => saveExcel(d.awbs, d.operator, inp.value, ts);
             document.getElementById(`pr-${docSnap.id}`).onclick = () => runPrint(inp.value, d.operator, ts.toLocaleString(), d.count, d.awbs);
-            document.getElementById(`cp-${docSnap.id}`).onclick = () => copyToClipboard(d.awbs);
-            document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete Record?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
-
+            document.getElementById(`cp-${docSnap.id}`).onclick = () => copyTableToClipboard(d.awbs);
+            document.getElementById(`del-${docSnap.id}`).onclick = async () => { if(confirm("Delete Manifest?")) { await deleteDoc(doc(db, "manifests", docSnap.id)); loadAdminData(); } };
             edtBtn.onclick = () => { inp.disabled = false; edtBtn.classList.add('d-none'); savBtn.classList.remove('d-none'); inp.focus(); };
             savBtn.onclick = async () => {
                 await updateDoc(doc(db, "manifests", docSnap.id), { courier: inp.value.trim() });
@@ -271,8 +256,8 @@
                 alert("Updated!");
             };
         });
-        document.getElementById('totalVolumeCount').innerText = volume;
-        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No matching records.</p>";
+        document.getElementById('totalVolumeCount').innerText = vol;
+        if(!found) grid.innerHTML = "<p class='p-5 text-center text-muted'>No matching records found.</p>";
     };
 
     function saveExcel(list, op, cr, dObj) {
@@ -296,12 +281,12 @@
 
     window.preparePrintCurrent = () => runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
 
-    function copyToClipboard(awbs) {
+    function copyTableToClipboard(awbs) {
         let h = `<table border="1" style="border-collapse:collapse;"><tr><th>SL</th><th>AWB NUMBER</th></tr>`;
         awbs.forEach((a, i) => { h += `<tr><td style="text-align:center;">${i + 1}</td><td>${a}</td></tr>`; });
         h += `</table>`;
-        const b = new Blob([h], { type: 'text/html' });
-        navigator.clipboard.write([new ClipboardItem({ 'text/html': b })]).then(() => alert("Table Copied with SL No and Borders!"));
+        const blob = new Blob([h], { type: 'text/html' });
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]).then(() => alert("Table Copied with Borders!"));
     }
 </script>
 </body>
