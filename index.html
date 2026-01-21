@@ -36,7 +36,7 @@
         }
     </style>
 </head>
-<body onclick="keepFocus()">
+<body>
 
 <div id="printView">
     <h3 style="text-align: center; margin: 0; letter-spacing: 3px;">MEDIKA BAZAAR</h3>
@@ -125,7 +125,7 @@
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="sndAmbulance" src="https://assets.mixkit.co/active_storage/sfx/2859/2859-preview.mp3"></audio>
+<audio id="sndPolice" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -144,16 +144,14 @@
     const db = getFirestore(app);
     let items = [];
     let opName = "";
-    let isScannerActive = false;
 
     document.getElementById('filterDate').valueAsDate = new Date();
-    window.keepFocus = () => { if(isScannerActive) document.getElementById('awbInput').focus(); };
 
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
         if(!val) return alert("Enter Name");
         if(val === "0000") { showState('adminView'); loadAdminData(); }
-        else { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); isScannerActive = true; document.getElementById('awbInput').focus(); }
+        else { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); document.getElementById('awbInput').focus(); }
     };
 
     function showState(id) {
@@ -166,8 +164,8 @@
             const val = e.target.value.trim().replace(/(\r\n|\n|\r)/gm, "");
             if(!val) return;
             if (items.includes(val)) {
-                document.getElementById('sndAmbulance').play();
-                setTimeout(() => alert("🚨 DUPLICATE AWB!\nAWB: " + val), 200);
+                document.getElementById('sndPolice').play();
+                setTimeout(() => alert("🚨 POLICE ALERT: DUPLICATE AWB!\nAWB: " + val), 200);
             } else {
                 document.getElementById('sndScan').play();
                 items.push(val);
@@ -236,7 +234,7 @@
                             <button class="btn btn-sm btn-dark" id="pr-${docSnap.id}">Print</button>
                             <button class="btn btn-sm btn-success" id="dl-${docSnap.id}">Excel</button>
                         </div>
-                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Excel/Mail</button>
+                        <button class="btn btn-sm btn-outline-primary" id="cp-${docSnap.id}">Copy for Mail/Excel</button>
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-warning w-50" id="edt-${docSnap.id}">Edit</button>
                             <button class="btn btn-sm btn-primary w-50 d-none" id="sav-${docSnap.id}">Save</button>
@@ -268,7 +266,8 @@
         const wsData = [["MEDIKA BAZAAR"],["COURIER:", cr],["OPERATOR:", op],["COUNT:", list.length],["DATE:", dObj.toLocaleString()],[],["SL", "AWB NUMBER"]];
         list.forEach((a, i) => wsData.push([i+1, a]));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
-        XLSX.writeFile(wb, `${cr}_${dObj.getDate()}-${dObj.getMonth()+1}.xlsx`);
+        const ts = `${dObj.getDate().toString().padStart(2, '0')}-${(dObj.getMonth()+1).toString().padStart(2, '0')}`;
+        XLSX.writeFile(wb, `${cr}_${ts}.xlsx`);
     }
 
     function runPrint(cr, op, date, count, awbs) {
@@ -283,37 +282,16 @@
     }
 
     function copyTableToClipboard(awbs, cr, date) {
-        // Create an HTML structure that Mail clients and Excel recognize
-        let html = `
-            <div style="font-family: Arial, sans-serif;">
-                <h3 style="color: #004a99; margin-bottom: 5px;">MEDIKA BAZAAR MANIFEST</h3>
-                <p><strong>Courier:</strong> ${cr} | <strong>Date:</strong> ${date} | <strong>Total AWBs:</strong> ${awbs.length}</p>
-                <table border="1" cellpadding="5" style="border-collapse: collapse; width: 100%; max-width: 400px; border: 1px solid black;">
-                    <thead>
-                        <tr style="background-color: #f2f2f2;">
-                            <th style="border: 1px solid black;">SL</th>
-                            <th style="border: 1px solid black;">AWB NUMBER</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-        
-        awbs.forEach((awb, index) => {
-            html += `
-                <tr>
-                    <td style="border: 1px solid black; text-align: center;">${index + 1}</td>
-                    <td style="border: 1px solid black;">${awb}</td>
-                </tr>`;
-        });
-
+        let html = `<div style="font-family: Arial, sans-serif;"><h3 style="color: #004a99;">MEDIKA BAZAAR MANIFEST</h3><p><strong>Courier:</strong> ${cr} | <strong>Date:</strong> ${date}</p><table border="1" style="border-collapse: collapse; width: 100%; max-width: 400px;"><thead><tr style="background-color: #f2f2f2;"><th>SL</th><th>AWB NUMBER</th></tr></thead><tbody>`;
+        awbs.forEach((awb, index) => { html += `<tr><td style="text-align: center;">${index + 1}</td><td>${awb}</td></tr>`; });
         html += `</tbody></table></div>`;
-
         const blob = new Blob([html], { type: 'text/html' });
-        const data = [new ClipboardItem({ 'text/html': blob })];
-        
-        navigator.clipboard.write(data).then(() => {
-            alert("Table copied! You can now paste this directly into Gmail, Outlook, or Excel with full formatting.");
-        });
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]).then(() => alert("Formatted Table Copied!"));
     }
+
+    window.preparePrintCurrent = () => runPrint(document.getElementById('courierType').value || "GENERAL", opName, new Date().toLocaleString(), items.length, items);
+    window.downloadExcelUser = () => saveExcel(items, opName, document.getElementById('courierType').value || "Manifest", new Date());
+
 </script>
 </body>
 </html>
