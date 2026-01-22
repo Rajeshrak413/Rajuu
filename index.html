@@ -16,8 +16,6 @@
         .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); cursor: default; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
-        
-        /* Highlight manifest when searching AWB */
         .found-highlight { border: 3px solid var(--edit) !important; background-color: var(--highlight) !important; transform: scale(1.02); z-index: 10; }
 
         @media print {
@@ -143,6 +141,15 @@
     let editMode = false;
     let scannerActive = false;
 
+    // Helper: Formats Date for Filenames (DD-MM-YYYY)
+    const getFileFormatDate = (dObj) => {
+        const d = dObj || new Date();
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+
     const getBucketDate = () => {
         const d = new Date();
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -165,7 +172,6 @@
         document.getElementById(id).style.display = 'block';
     }
 
-    // AUTO-ENTER SCAN LOGIC
     document.getElementById('awbInput').addEventListener('input', (e) => {
         const val = e.target.value.trim();
         if(val.length < 5) return;
@@ -210,9 +216,15 @@
         }
     };
 
-    // EXPORT ENGINE
+    // UPDATED EXPORT ENGINE (Date First Naming)
     window.runExport = (type, data) => {
-        const { courier, operator, date, count, awbs } = data;
+        const { courier, operator, date, count, awbs, rawDate } = data;
+        
+        // Sequence: Date_CourierType
+        const formattedDate = getFileFormatDate(rawDate);
+        const safeCourier = courier.replace(/\s+/g, '_');
+        const fileName = `${formattedDate}_${safeCourier}`;
+
         if(type === 'print') {
             document.getElementById('p-courier').innerText = courier;
             document.getElementById('p-op').innerText = operator;
@@ -229,23 +241,22 @@
             doc.circle(180, 30, 15); doc.setFontSize(20); doc.text(count.toString(), 180, 32, { align: "center" });
             doc.line(15, 45, 195, 45); doc.setFontSize(11); doc.text(`Op: ${operator} | Date: ${date}`, 15, 52);
             const mid = Math.ceil(awbs.length / 2);
-            doc.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i + 1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
-            doc.autoTable({ body: awbs.slice(mid).map((a, i) => [mid + i + 1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
-            doc.save(`${courier}.pdf`);
+            doc.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i+1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
+            doc.autoTable({ body: awbs.slice(mid).map((a, i) => [mid+i+1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
+            doc.save(`${fileName}.pdf`);
         } else if(type === 'excel') {
             const wb = XLSX.utils.book_new();
             const wsData = [["SL", "AWB NUMBER"]]; awbs.forEach((a, i) => wsData.push([i+1, a]));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
-            XLSX.writeFile(wb, `${courier}.xlsx`);
+            XLSX.writeFile(wb, `${fileName}.xlsx`);
         }
     };
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid');
-        grid.innerHTML = "<p class='p-5 text-center'>Searching Database...</p>";
+        grid.innerHTML = "<p class='p-5 text-center'>Syncing bucket...</p>";
         const filterDate = document.getElementById('filterDate').value;
         const searchAWB = document.getElementById('searchAWB').value.trim();
-        
         const q = query(collection(db, "manifests"), orderBy("time", "desc"));
         const snap = await getDocs(q);
         grid.innerHTML = ""; let totalVol = 0;
@@ -254,17 +265,12 @@
             const d = docSnap.data();
             const ts = d.time ? d.time.toDate() : new Date();
             const recLocalDate = ts.getFullYear() + '-' + String(ts.getMonth() + 1).padStart(2, '0') + '-' + String(ts.getDate()).padStart(2, '0');
-
-            // Apply Date Filter only if no AWB Search is active
             if (!searchAWB && filterDate && recLocalDate !== filterDate) return;
-            
-            // Search AWB Filter logic
             const containsAWB = searchAWB ? d.awbs.some(awb => awb.includes(searchAWB)) : true;
             if (searchAWB && !containsAWB) return;
-
             totalVol += d.count;
-            const cardData = JSON.stringify({ courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs });
-            
+
+            const cardData = JSON.stringify({ courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs, rawDate: ts });
             const col = document.createElement('div');
             col.className = "col-md-4 mb-4";
             col.innerHTML = `
@@ -279,7 +285,7 @@
                         </div>
                         <button class="btn btn-sm btn-success" onclick='runExport("excel", ${cardData})'>Excel Export</button>
                         <button class="btn btn-sm btn-warning fw-bold" onclick="updateC('${docSnap.id}')">Update Courier</button>
-                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${docSnap.id}')" style="cursor:pointer">Delete Manifest</a></div>
+                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${docSnap.id}')" style="cursor:pointer">Delete</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
@@ -293,8 +299,8 @@
     };
 
     window.deleteRec = async (id) => { if(confirm("Permanently delete?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
-    window.preparePrintCurrent = () => window.runExport("print", { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items });
-    window.downloadExcelUser = () => window.runExport("excel", { courier: document.getElementById('courierType').value || "Manifest", awbs: items });
+    window.preparePrintCurrent = () => window.runExport("print", { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date() });
+    window.downloadExcelUser = () => window.runExport("excel", { courier: document.getElementById('courierType').value || "Manifest", awbs: items, rawDate: new Date() });
 </script>
 </body>
 </html>
