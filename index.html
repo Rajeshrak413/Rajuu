@@ -9,14 +9,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
-        :root { --medika: #004a99; --danger: #dc3545; --edit: #ffc107; }
+        :root { --medika: #004a99; --danger: #dc3545; --edit: #ffc107; --highlight: #fff3cd; }
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        /* Keyboard-free scan input styling */
         .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); cursor: default; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
+        
+        /* Highlight manifest when searching AWB */
+        .found-highlight { border: 3px solid var(--edit) !important; background-color: var(--highlight) !important; transform: scale(1.02); z-index: 10; }
 
         @media print {
             body * { visibility: hidden; }
@@ -51,7 +53,7 @@
 
 <nav class="navbar py-3 no-print shadow">
     <div class="container d-flex justify-content-between align-items-center">
-        <h3 class="m-0 fw-bold">MEDIKA BAZAAR AWB SCAN</h3>
+        <h3 class="m-0 fw-bold">MEDIKA BAZAAR</h3>
         <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT</button>
     </div>
 </nav>
@@ -60,7 +62,7 @@
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5">
             <div class="card p-5 text-center shadow">
-                <h2 class="mb-4 text-primary fw-bold">Warehouse Portal</h2>
+                <h2 class="mb-4 text-primary fw-bold">Logistics Master</h2>
                 <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
                 <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS SYSTEM</button>
             </div>
@@ -74,7 +76,6 @@
                 <input type="text" id="courierType" class="form-control mb-3 text-center fw-bold" placeholder="Courier Name">
                 <label class="fw-bold text-danger d-block mb-1">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off" inputmode="none">
-                <p class="small text-muted mt-1">(Keyboard Disabled for Scanning)</p>
                 <div class="d-grid gap-2 mt-3">
                     <button id="syncBtn" class="btn btn-success btn-lg fw-bold shadow" onclick="confirmSync()">COMPLETE & SYNC</button>
                     <div class="row g-2">
@@ -102,17 +103,17 @@
 
     <div id="adminView">
         <div class="row mb-3 align-items-center">
-            <div class="col-md-4"><h4>Admin Panel</h4></div>
-            <div class="col-md-5">
+            <div class="col-md-3"><h4>Admin Panel</h4></div>
+            <div class="col-md-6">
                 <div class="input-group">
-                    <span class="input-group-text">Filter Date:</span>
+                    <input type="text" id="searchAWB" class="form-control" placeholder="🔍 Search AWB Number..." oninput="loadAdminData()">
                     <input type="date" id="filterDate" class="form-control" onchange="loadAdminData()">
                 </div>
             </div>
             <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button></div>
         </div>
         <div class="card p-3 mb-4 shadow-sm text-center bg-white border-start border-primary border-4">
-            <h5 class="m-0 text-uppercase">DATE TOTAL: <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
+            <h5 class="m-0 text-uppercase">TOTAL PROCESSED: <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
         </div>
         <div id="adminGrid" class="row"></div>
     </div>
@@ -142,10 +143,8 @@
     let editMode = false;
     let scannerActive = false;
 
-    // BUSINESS DAY LOGIC: Strictly 00:01 as a new bucket
     const getBucketDate = () => {
         const d = new Date();
-        // Return YYYY-MM-DD format
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     };
 
@@ -204,14 +203,14 @@
         if (items.length === 0) return alert("Nothing to sync");
         if (confirm(`Sync ${items.length} AWBs for ${cr}?`)) {
             await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
-            alert("✅ Successfully Synced!"); 
+            alert("✅ Synced Successfully!"); 
             items = []; renderScanList();
             initFilter();
             if(document.getElementById('adminView').style.display === 'block') loadAdminData();
         }
     };
 
-    // EXPORT ENGINE (PDF, Excel, Print)
+    // EXPORT ENGINE
     window.runExport = (type, data) => {
         const { courier, operator, date, count, awbs } = data;
         if(type === 'print') {
@@ -230,8 +229,8 @@
             doc.circle(180, 30, 15); doc.setFontSize(20); doc.text(count.toString(), 180, 32, { align: "center" });
             doc.line(15, 45, 195, 45); doc.setFontSize(11); doc.text(`Op: ${operator} | Date: ${date}`, 15, 52);
             const mid = Math.ceil(awbs.length / 2);
-            doc.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i+1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
-            doc.autoTable({ body: awbs.slice(mid).map((a, i) => [mid+i+1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
+            doc.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i + 1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
+            doc.autoTable({ body: awbs.slice(mid).map((a, i) => [mid + i + 1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
             doc.save(`${courier}.pdf`);
         } else if(type === 'excel') {
             const wb = XLSX.utils.book_new();
@@ -243,27 +242,33 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid');
-        grid.innerHTML = "<p class='p-5 text-center'>Loading Date Bucket...</p>";
-        const filterVal = document.getElementById('filterDate').value;
+        grid.innerHTML = "<p class='p-5 text-center'>Searching Database...</p>";
+        const filterDate = document.getElementById('filterDate').value;
+        const searchAWB = document.getElementById('searchAWB').value.trim();
         
         const q = query(collection(db, "manifests"), orderBy("time", "desc"));
         const snap = await getDocs(q);
-        grid.innerHTML = ""; let vol = 0;
+        grid.innerHTML = ""; let totalVol = 0;
 
         snap.forEach(docSnap => {
             const d = docSnap.data();
             const ts = d.time ? d.time.toDate() : new Date();
             const recLocalDate = ts.getFullYear() + '-' + String(ts.getMonth() + 1).padStart(2, '0') + '-' + String(ts.getDate()).padStart(2, '0');
 
-            if (filterVal && recLocalDate !== filterVal) return;
+            // Apply Date Filter only if no AWB Search is active
+            if (!searchAWB && filterDate && recLocalDate !== filterDate) return;
+            
+            // Search AWB Filter logic
+            const containsAWB = searchAWB ? d.awbs.some(awb => awb.includes(searchAWB)) : true;
+            if (searchAWB && !containsAWB) return;
 
-            vol += d.count;
+            totalVol += d.count;
             const cardData = JSON.stringify({ courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs });
             
             const col = document.createElement('div');
             col.className = "col-md-4 mb-4";
             col.innerHTML = `
-                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3">
+                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary ${searchAWB ? 'found-highlight' : ''}">
                     <span class="badge bg-danger awb-count-badge">${d.count}</span>
                     <input type="text" class="form-control form-control-sm fw-bold border-primary mb-1" value="${d.courier}" id="inp-${docSnap.id}">
                     <p class="small text-muted mb-2">${ts.toLocaleTimeString()} | User: ${d.operator}</p>
@@ -279,7 +284,7 @@
                 </div>`;
             grid.appendChild(col);
         });
-        document.getElementById('totalVolumeCount').innerText = vol;
+        document.getElementById('totalVolumeCount').innerText = totalVol;
     };
 
     window.updateC = async (id) => {
@@ -287,7 +292,7 @@
         alert("Courier Name Updated!"); loadAdminData();
     };
 
-    window.deleteRec = async (id) => { if(confirm("Delete this manifest?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
+    window.deleteRec = async (id) => { if(confirm("Permanently delete?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
     window.preparePrintCurrent = () => window.runExport("print", { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items });
     window.downloadExcelUser = () => window.runExport("excel", { courier: document.getElementById('courierType').value || "Manifest", awbs: items });
 </script>
