@@ -16,14 +16,14 @@
         .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); cursor: default; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
-        .found-highlight { border: 3px solid var(--edit) !important; background-color: var(--highlight) !important; }
 
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
             #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; background: white; }
+            .lot-label { font-size: 18pt; font-weight: bold; text-align: center; text-decoration: underline; margin-bottom: 5px; }
             .p-courier-left { font-size: 55pt !important; font-weight: 900; text-transform: uppercase; line-height: 1; }
-            .p-count-circle-right { font-size: 55pt !important; font-weight: 900; width: 140px; height: 140px; border: 6px solid black; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center; }
+            .p-count-circle-right { font-size: 55pt !important; font-weight: 900; width: 140px; height: 140px; border: 6px solid black; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
             .print-sub-info { display: flex; justify-content: space-between; font-size: 14pt; border-top: 3px solid black; border-bottom: 3px solid black; padding: 5px 0; margin-top: 10px; }
             .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
             .print-table { width: 100%; border-collapse: collapse; border: 1px solid black; }
@@ -34,6 +34,7 @@
 <body onclick="autoFocusScanner()">
 
 <div id="printView">
+    <div class="lot-label" id="p-lot"></div>
     <h3 style="text-align: center; margin: 0; letter-spacing: 3px;">MEDIKA BAZAAR</h3>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
         <div class="p-courier-left" id="p-courier"></div>
@@ -50,20 +51,18 @@
 </div>
 
 <nav class="navbar py-3 no-print shadow">
-    <div class="container d-flex justify-content-between align-items-center">
+    <div class="container d-flex justify-content-between">
         <h3 class="m-0 fw-bold">MEDIKA BAZAAR</h3>
-        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT / HOME</button>
+        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">HOME</button>
     </div>
 </nav>
 
 <div class="container mt-4 no-print">
     <div id="loginView" class="row justify-content-center mt-5">
-        <div class="col-md-5">
-            <div class="card p-5 text-center shadow">
-                <h2 class="mb-4 text-primary fw-bold">Warehouse Portal</h2>
-                <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
-                <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS SYSTEM</button>
-            </div>
+        <div class="col-md-5 card p-5 text-center shadow">
+            <h2 class="mb-4 text-primary fw-bold">Warehouse Portal</h2>
+            <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
+            <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ENTER</button>
         </div>
     </div>
 
@@ -83,18 +82,16 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-7">
-            <div class="card p-3 shadow-sm h-100 border-top border-primary border-3">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="text-primary m-0">Live Scan: <span id="totalCount" class="badge bg-primary">0</span></h5>
-                    <button class="btn btn-sm btn-warning fw-bold" id="toggleEdit" onclick="toggleEditMode()">EDIT LIST</button>
-                </div>
-                <div class="table-responsive border rounded" style="max-height: 500px;">
-                    <table class="table table-hover text-center m-0">
-                        <thead class="table-dark sticky-top"><tr><th>SL</th><th>AWB Number</th><th class="edit-col d-none">X</th></tr></thead>
-                        <tbody id="scanBody"></tbody>
-                    </table>
-                </div>
+        <div class="col-lg-7 card p-3 shadow-sm h-100 border-top border-primary border-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0">Live Scan: <span id="totalCount" class="badge bg-primary">0</span></h5>
+                <button class="btn btn-sm btn-warning fw-bold" id="toggleEdit" onclick="toggleEditMode()">EDIT LIST</button>
+            </div>
+            <div class="table-responsive border rounded" style="max-height: 500px;">
+                <table class="table table-hover text-center m-0">
+                    <thead class="table-dark sticky-top"><tr><th>SL</th><th>AWB Number</th><th class="edit-col d-none">X</th></tr></thead>
+                    <tbody id="scanBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -104,7 +101,7 @@
             <div class="col-md-3"><h4>Admin Dashboard</h4></div>
             <div class="col-md-6">
                 <div class="input-group">
-                    <input type="text" id="searchAWB" class="form-control" placeholder="🔍 Search AWB Number..." oninput="loadAdminData()">
+                    <input type="text" id="searchAWB" class="form-control" placeholder="🔍 Search AWB..." oninput="loadAdminData()">
                     <input type="date" id="filterDate" class="form-control" onchange="loadAdminData()">
                 </div>
             </div>
@@ -117,9 +114,29 @@
     </div>
 </div>
 
+<div class="modal fade" id="awbModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">Edit Manifest AWBs</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive" style="max-height: 400px;">
+                    <table class="table table-bordered text-center">
+                        <thead class="table-light"><tr><th>SL</th><th>AWB Number</th><th>Action</th></tr></thead>
+                        <tbody id="modalTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
 <audio id="sndPolice" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -141,7 +158,8 @@
     let scanTimer;
     let editMode = false;
     let scannerActive = false;
-    let adminDataStore = {}; // Central Data Repository for Admin Buttons
+    let adminDataStore = {}; 
+    const awbModal = new bootstrap.Modal(document.getElementById('awbModal'));
 
     const getLocalDate = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     const getFileDate = (d = new Date()) => String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
@@ -192,14 +210,22 @@
         }
     };
 
-    // --- CENTRAL EXPORT ENGINE ---
+    const getLotSuffix = (n) => {
+        if (n === 1) return "1st Lot";
+        if (n === 2) return "2nd Lot";
+        if (n === 3) return "3rd Lot";
+        return n + "th Lot";
+    };
+
     window.processExport = (id, type) => {
         const data = adminDataStore[id];
         if(!data) return;
-        const { courier, operator, date, count, awbs, rawDate } = data;
+        const { courier, operator, date, count, awbs, rawDate, lotNumber } = data;
         const fileName = `${getFileDate(rawDate)}_${courier.replace(/\s+/g, '_')}`;
+        const lotText = lotNumber ? getLotSuffix(lotNumber) : "";
 
         if(type === 'print') {
+            document.getElementById('p-lot').innerText = lotText;
             document.getElementById('p-courier').innerText = courier;
             document.getElementById('p-op').innerText = operator;
             document.getElementById('p-date').innerText = date;
@@ -210,17 +236,19 @@
             window.print();
         } else if(type === 'pdf') {
             const { jsPDF } = window.jspdf; const docPDF = new jsPDF();
-            docPDF.setFontSize(10); docPDF.text("MEDIKA BAZAAR LOGISTICS", 105, 10, { align: "center" });
-            docPDF.setFontSize(40); docPDF.text(courier.toUpperCase(), 15, 35);
-            docPDF.circle(180, 30, 15); docPDF.setFontSize(20); docPDF.text(count.toString(), 180, 32, { align: "center" });
-            docPDF.line(15, 45, 195, 45); docPDF.setFontSize(11); docPDF.text(`Op: ${operator} | Date: ${date}`, 15, 52);
+            docPDF.setFontSize(14); docPDF.text(lotText, 105, 10, { align: "center" });
+            docPDF.setFontSize(10); docPDF.text("MEDIKA BAZAAR LOGISTICS", 105, 16, { align: "center" });
+            docPDF.setFontSize(40); docPDF.text(courier.toUpperCase(), 15, 38);
+            docPDF.circle(180, 33, 15); docPDF.setFontSize(20); docPDF.text(count.toString(), 180, 35, { align: "center" });
+            docPDF.line(15, 48, 195, 48); docPDF.setFontSize(11); docPDF.text(`Op: ${operator} | Date: ${date}`, 15, 55);
             const mid = Math.ceil(awbs.length / 2);
-            docPDF.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i+1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
-            docPDF.autoTable({ body: awbs.slice(mid).map((a, i) => [mid+i+1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
+            docPDF.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i+1, a]), startY: 63, margin: { right: 105 }, theme: 'grid' });
+            docPDF.autoTable({ body: awbs.slice(mid).map((a, i) => [mid+i+1, a]), startY: 63, margin: { left: 105 }, theme: 'grid' });
             docPDF.save(`${fileName}.pdf`);
         } else if(type === 'excel') {
             const wb = XLSX.utils.book_new();
-            const wsData = [["SL", "AWB NUMBER"]]; awbs.forEach((a, i) => wsData.push([i+1, a]));
+            const wsData = [["LOT:", lotText], ["SL", "AWB NUMBER"]];
+            awbs.forEach((a, i) => wsData.push([i+1, a]));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
             XLSX.writeFile(wb, `${fileName}.xlsx`);
         }
@@ -228,44 +256,74 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid');
-        grid.innerHTML = "<p class='p-5 text-center'>Refreshing Bucket...</p>";
+        grid.innerHTML = "<p class='p-5 text-center'>Loading...</p>";
         const fDate = document.getElementById('filterDate').value;
-        const search = document.getElementById('searchAWB').value.trim();
-        const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "desc")));
+        const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "asc"))); // Sort ASC to calculate Lots correctly
         grid.innerHTML = ""; let vol = 0; adminDataStore = {};
-
+        
+        let dailyManifests = [];
         snap.forEach(docSnap => {
             const d = docSnap.data();
             const ts = d.time ? d.time.toDate() : new Date();
-            const recordDate = getLocalDate(ts);
+            const recDate = getLocalDate(ts);
+            if (recDate === fDate) dailyManifests.push({ id: docSnap.id, ...d, ts });
+        });
 
-            if (!search && fDate && recordDate !== fDate) return;
-            if (search && !d.awbs.some(a => a.includes(search))) return;
-
+        // Show newest first on screen, but lot numbers follow sync order
+        dailyManifests.reverse().forEach((d, index) => {
+            const lotNumber = dailyManifests.length - index;
             vol += d.count;
-            const id = docSnap.id;
-            adminDataStore[id] = { courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs, rawDate: ts };
+            adminDataStore[d.id] = { ...d, date: d.ts.toLocaleString(), rawDate: d.ts, lotNumber };
 
             const col = document.createElement('div');
             col.className = "col-md-4 mb-4";
             col.innerHTML = `
-                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3 ${search ? 'found-highlight' : ''}">
+                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3">
                     <span class="badge bg-danger awb-count-badge">${d.count}</span>
-                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-1" value="${d.courier}" id="inp-${id}">
-                    <p class="small text-muted mb-2">${ts.toLocaleTimeString()} | Op: ${d.operator}</p>
+                    <h6 class="text-center text-secondary">${getLotSuffix(lotNumber)}</h6>
+                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-1" value="${d.courier}" id="inp-${d.id}">
+                    <p class="small text-muted mb-2">${d.ts.toLocaleTimeString()} | Op: ${d.operator}</p>
                     <div class="d-grid gap-1">
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-dark" onclick="processExport('${id}', 'print')">Print</button>
-                            <button class="btn btn-sm btn-info text-white" onclick="processExport('${id}', 'pdf')">PDF</button>
+                            <button class="btn btn-sm btn-dark" onclick="processExport('${d.id}', 'print')">Print</button>
+                            <button class="btn btn-sm btn-info text-white" onclick="processExport('${d.id}', 'pdf')">PDF</button>
                         </div>
-                        <button class="btn btn-sm btn-success" onclick="processExport('${id}', 'excel')">Excel</button>
-                        <button class="btn btn-sm btn-warning fw-bold" onclick="updateC('${id}')">Update Name</button>
-                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${id}')" style="cursor:pointer">Delete</a></div>
+                        <button class="btn btn-sm btn-success" onclick="processExport('${d.id}', 'excel')">Excel</button>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-dark" onclick="openAwbEdit('${d.id}')">Edit AWBs</button>
+                            <button class="btn btn-sm btn-warning fw-bold" onclick="updateC('${d.id}')">Save Name</button>
+                        </div>
+                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${d.id}')" style="cursor:pointer">Delete Manifest</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
         });
         document.getElementById('totalVolumeCount').innerText = vol;
+    };
+
+    window.openAwbEdit = (id) => {
+        const d = adminDataStore[id];
+        const tbody = document.getElementById('modalTableBody');
+        tbody.innerHTML = d.awbs.map((awb, i) => `
+            <tr>
+                <td>${i+1}</td>
+                <td>${awb}</td>
+                <td><button class="btn btn-danger btn-sm" onclick="deleteAwbFromManifest('${id}', ${i})">Delete</button></td>
+            </tr>
+        `).join('');
+        awbModal.show();
+    };
+
+    window.deleteAwbFromManifest = async (manifestId, index) => {
+        if(!confirm("Remove this AWB?")) return;
+        const d = adminDataStore[manifestId];
+        d.awbs.splice(index, 1);
+        await updateDoc(doc(db, "manifests", manifestId), { 
+            awbs: d.awbs, 
+            count: d.awbs.length 
+        });
+        awbModal.hide();
+        loadAdminData();
     };
 
     window.updateC = async (id) => {
@@ -275,15 +333,14 @@
 
     window.deleteRec = async (id) => { if(confirm("Delete manifest?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
 
-    // Scanner View Helpers
     window.userPrint = () => {
         const id = 'user-current';
-        adminDataStore[id] = { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date() };
+        adminDataStore[id] = { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date(), lotNumber: 0 };
         window.processExport(id, 'print');
     };
     window.userExcel = () => {
         const id = 'user-current';
-        adminDataStore[id] = { courier: document.getElementById('courierType').value || "Manifest", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date() };
+        adminDataStore[id] = { courier: document.getElementById('courierType').value || "Manifest", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date(), lotNumber: 0 };
         window.processExport(id, 'excel');
     };
 </script>
