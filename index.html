@@ -96,13 +96,13 @@
     </div>
 
     <div id="adminView">
-        <div class="row mb-3 align-items-center">
-            <div class="col-md-3"><h4>Admin History</h4></div>
-            <div class="col-md-4"><input type="text" id="searchAWB" class="form-control border-success" placeholder="🔍 Search AWB Number..." oninput="window.renderAdminUI()"></div>
-            <div class="col-md-3"><input type="date" id="filterDate" class="form-control" onchange="window.renderAdminUI()"></div>
-            <div class="col-md-2 text-end">Total: <b id="dayVolume" class="fs-4">0</b></div>
+        <div class="row mb-3 align-items-center bg-white p-3 rounded shadow-sm mx-0 border-start border-primary border-5">
+            <div class="col-md-2"><h5>Admin Live</h5></div>
+            <div class="col-md-4"><input type="text" id="searchAWB" class="form-control border-primary" placeholder="🔍 Search AWB Number..." oninput="window.renderAdminUI()"></div>
+            <div class="col-md-3"><input type="date" id="filterDate" class="form-control border-primary" onchange="window.renderAdminUI()"></div>
+            <div class="col-md-3 text-end"><span class="text-muted">Day Vol:</span> <b id="dayVolume" class="fs-4 text-primary">0</b></div>
         </div>
-        <div id="adminGrid" class="row"></div>
+        <div id="adminGrid" class="row mt-3"></div>
     </div>
 </div>
 
@@ -114,9 +114,9 @@
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3 p-3 bg-light rounded">
-                    <h6>Change Courier Type</h6>
-                    <select id="editCourierType" class="form-select fw-bold">
+                <div class="mb-3 p-3 bg-light rounded border">
+                    <label class="fw-bold mb-1">Change Courier Type</label>
+                    <select id="editCourierType" class="form-select fw-bold border-primary">
                         <option value="ST COURIER">ST COURIER</option>
                         <option value="BLUEDART">BLUEDART</option>
                         <option value="XPRESS BEES">XPRESS BEES</option>
@@ -130,7 +130,7 @@
                         <thead class="table-dark"><tr><th>AWB Number</th><th>Action</th></tr></thead>
                         <tbody id="modalTableBody"></tbody>
                         <tfoot>
-                            <tr class="table-primary">
+                            <tr class="table-info">
                                 <td><input type="text" id="newAwbInput" class="form-control text-center fw-bold" placeholder="Type Missing AWB"></td>
                                 <td><button class="btn btn-primary w-100" onclick="window.addNewAwb()">+ ADD AWB</button></td>
                             </tr>
@@ -139,7 +139,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-success w-100 fw-bold" onclick="window.saveManifestChanges()">SAVE ALL CHANGES</button>
+                <button class="btn btn-success w-100 fw-bold py-2" onclick="window.saveManifestChanges()">SAVE CHANGES</button>
             </div>
         </div>
     </div>
@@ -160,10 +160,12 @@
     let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}, activeManifestId = null; 
     const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
 
-    const getFormattedDate = () => {
-        const d = new Date();
-        return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
-    };
+    // Date Helper: YYYY-MM-DD
+    const getISODate = (d = new Date()) => d.toISOString().split('T')[0];
+    const getFormattedDisplayDate = (d = new Date()) => `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+
+    // Set Default Filter to Today
+    document.getElementById('filterDate').value = getISODate();
 
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
@@ -188,7 +190,7 @@
         const val = e.target.value.trim().toUpperCase();
         if(val.length < 4) return;
         setTimeout(() => {
-            if (items.includes(val)) { document.getElementById('sndPolice').play(); alert("DUPLICATE"); }
+            if (items.includes(val)) { document.getElementById('sndPolice').play(); alert("DUPLICATE SCAN!"); }
             else { document.getElementById('sndScan').play(); items.unshift(val); renderScanList(); }
             e.target.value = '';
         }, 200);
@@ -202,9 +204,16 @@
     window.confirmSync = async () => {
         const s = document.getElementById('courierSelect').value;
         const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
-        if (!cr || !items.length) return alert("Missing Info");
-        await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: [...items].reverse(), count: items.length, time: serverTimestamp() });
-        items = []; renderScanList(); alert("Synced Successfully");
+        if (!cr || !items.length) return alert("Missing Courier or AWBs");
+        await addDoc(collection(db, "manifests"), { 
+            operator: opName, 
+            courier: cr, 
+            awbs: [...items].reverse(), 
+            count: items.length, 
+            time: serverTimestamp(),
+            creationDay: getISODate() // Store day as string for robust filtering
+        });
+        items = []; renderScanList(); alert("Manifest Synced!");
     };
 
     const startLiveSync = () => {
@@ -216,24 +225,31 @@
 
     window.renderAdminUI = () => {
         const grid = document.getElementById('adminGrid');
+        const selectedDate = document.getElementById('filterDate').value;
         const searchTerm = document.getElementById('searchAWB').value.trim().toUpperCase();
         grid.innerHTML = ""; let total = 0;
         
         cloudData.forEach((d, idx) => {
-            total += d.count; dataVault[d.id] = JSON.parse(JSON.stringify(d)); // Deep copy
+            // Filter by Date
+            const manifestDate = d.creationDay || (d.time ? getISODate(d.time.toDate()) : "");
+            if(manifestDate !== selectedDate) return;
+
+            // Filter by Search
             const hasMatch = searchTerm === "" || d.awbs.some(awb => awb.includes(searchTerm));
             if (!hasMatch) return;
 
-            const col = document.createElement('div'); 
-            col.className = "col-md-4 mb-3";
+            total += d.count; dataVault[d.id] = JSON.parse(JSON.stringify(d)); 
+            
+            const col = document.createElement('div'); col.className = "col-md-4 mb-3";
             col.innerHTML = `<div class="card p-3 border-top border-primary border-3">
                 <span class="badge bg-danger awb-count-badge">${d.count}</span>
                 <h6 class="text-center fw-bold">LOT ${idx+1} - ${d.courier}</h6>
+                <p class="small text-center text-muted mb-2">Time: ${d.time ? d.time.toDate().toLocaleTimeString() : 'Draft'}</p>
                 <div class="d-grid gap-1">
                     <button class="btn btn-sm btn-dark" onclick="window.triggerPrint('${d.id}')">Print</button>
-                    <button class="btn btn-sm btn-outline-dark" onclick="window.openAdminEditor('${d.id}')">Manage Manifest</button>
+                    <button class="btn btn-sm btn-outline-dark" onclick="window.openAdminEditor('${d.id}')">Edit Items</button>
                     <button class="btn btn-sm btn-success" onclick="window.triggerExcel('${d.id}')">Excel</button>
-                    <button class="btn btn-sm btn-danger" onclick="window.delManifest('${d.id}')">Delete Lot</button>
+                    <button class="btn btn-sm btn-danger mt-1" onclick="window.delManifest('${d.id}')">Delete Lot</button>
                 </div>
             </div>`;
             grid.prepend(col);
@@ -241,7 +257,6 @@
         document.getElementById('dayVolume').innerText = total;
     };
 
-    // ADMIN EDITOR LOGIC
     window.openAdminEditor = (id) => {
         activeManifestId = id;
         const d = dataVault[id];
@@ -256,8 +271,7 @@
             <tr>
                 <td><input type="text" class="form-control text-center fw-bold" value="${a}" oninput="window.updateAwbValue(${i}, this.value)"></td>
                 <td><button class="btn btn-sm btn-danger" onclick="window.removeAwbFromManifest(${i})">Remove</button></td>
-            </tr>
-        `).join('');
+            </tr>`).join('');
     }
 
     window.updateAwbValue = (idx, val) => { dataVault[activeManifestId].awbs[idx] = val.trim().toUpperCase(); };
@@ -272,21 +286,18 @@
 
     window.saveManifestChanges = async () => {
         const d = dataVault[activeManifestId];
-        const newCourier = document.getElementById('editCourierType').value;
         await updateDoc(doc(db, "manifests", activeManifestId), {
-            courier: newCourier,
+            courier: document.getElementById('editCourierType').value,
             awbs: d.awbs,
             count: d.awbs.length
         });
-        adminModal.hide();
-        alert("Manifest Updated!");
+        adminModal.hide(); alert("Updated Successfully");
     };
 
-    // EXPORTS
     window.triggerExcel = (id) => {
         const d = dataVault[id];
-        const fileName = `${getFormattedDate()}_${d.courier.replace(/\s+/g, '_')}.xlsx`;
-        const wsData = [["COURIER:", d.courier], ["OPERATOR:", d.operator], ["SL", "AWB NUMBER"]];
+        const fileName = `${getFormattedDisplayDate()}_${d.courier.replace(/\s+/g, '_')}.xlsx`;
+        const wsData = [["COURIER:", d.courier], ["OPERATOR:", d.operator], ["DATE:", getFormattedDisplayDate()], [], ["SL", "AWB NUMBER"]];
         d.awbs.forEach((a, i) => wsData.push([i + 1, a]));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
@@ -296,9 +307,9 @@
     window.userExcel = () => {
         const s = document.getElementById('courierSelect').value;
         const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
-        if(!cr || !items.length) return alert("Select Courier & Scan first");
-        const fileName = `${getFormattedDate()}_${cr.replace(/\s+/g, '_')}.xlsx`;
-        const wsData = [["COURIER:", cr], ["SL", "AWB NUMBER"]];
+        if(!cr || !items.length) return alert("Missing Info");
+        const fileName = `${getFormattedDisplayDate()}_${cr.replace(/\s+/g, '_')}.xlsx`;
+        const wsData = [["COURIER:", cr], ["DATE:", getFormattedDisplayDate()], [], ["SL", "AWB NUMBER"]];
         [...items].reverse().forEach((a, i) => wsData.push([i + 1, a]));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Draft");
@@ -307,10 +318,10 @@
 
     window.triggerPrint = (id) => {
         const d = dataVault[id];
-        const cols = parseInt(prompt("Columns?", "2")) || 2;
+        const cols = parseInt(prompt("Columns (1-4)?", "2")) || 2;
         document.getElementById('p-courier').innerText = d.courier;
         document.getElementById('p-op').innerText = d.operator;
-        document.getElementById('p-date').innerText = getFormattedDate();
+        document.getElementById('p-date').innerText = getFormattedDisplayDate();
         document.getElementById('p-count').innerText = d.count;
         const cont = document.getElementById('p-grid-container');
         cont.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
@@ -325,7 +336,18 @@
         window.print();
     };
 
-    window.delManifest = async (id) => { if(confirm("Delete Entire Lot?")) await deleteDoc(doc(db, "manifests", id)); };
+    window.delManifest = async (id) => {
+        const code = prompt("Enter ADMIN PASSCODE to delete:");
+        if (code === "1234") {
+            if(confirm("Confirm: This will permanently delete this lot. Proceed?")) {
+                await deleteDoc(doc(db, "manifests", id));
+                alert("Lot Deleted.");
+            }
+        } else {
+            alert("Wrong Passcode. Access Denied.");
+        }
+    };
+    
     window.userPrint = () => { const mockId = 'temp'; dataVault[mockId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length }; window.triggerPrint(mockId); };
 </script>
 </body>
