@@ -321,4 +321,11 @@
 
     window.delManifest = async (id) => {
         const code = prompt("Enter ADMIN PASSCODE:");
-        if (code === "1234") { if(confirm("Confirm Delete Lot?")) { await d
+        if (code === "1234") { if(confirm("Confirm Delete Lot?")) { await deleteDoc(doc(db, "manifests", id)); alert("Deleted."); } }
+        else { alert("Unauthorized."); }
+    };
+    
+    window.userPrint = () => { const mockId = 'temp'; dataVault[mockId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length }; window.triggerPrint(mockId); };
+</script>
+</body>
+</html>
