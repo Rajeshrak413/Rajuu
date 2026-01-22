@@ -17,6 +17,11 @@
         .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; cursor: default; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
+        
+        /* Volume Counter Card */
+        .volume-card { background: linear-gradient(135deg, #004a99 0%, #007bff 100%); color: white; border: none; }
+        .volume-label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+        .volume-number { font-size: 3.5rem; font-weight: 800; line-height: 1; }
 
         @media print {
             body * { visibility: hidden; }
@@ -61,31 +66,31 @@
 <div class="container mt-4 no-print">
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5 card p-5 text-center shadow">
-            <h2 class="mb-4 text-primary fw-bold">Warehouse Portal</h2>
+            <h2 class="mb-4 text-primary fw-bold">Logistics Master</h2>
             <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Operator Name">
-            <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS</button>
+            <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS SYSTEM</button>
         </div>
     </div>
 
     <div id="scannerView" class="row g-4">
-        <div class="col-lg-5">
-            <div class="card p-4 shadow-sm mb-3 border-top border-primary border-3 text-center">
-                <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <input type="text" id="courierType" class="form-control mb-3 fw-bold text-center" placeholder="Enter Courier Name">
+        <div class="col-lg-5 text-center">
+            <div class="card p-4 shadow-sm mb-3 border-top border-primary border-3">
+                <p class="mb-1 text-muted">Shift: <b id="displayUser"></b></p>
+                <input type="text" id="courierType" class="form-control mb-3 fw-bold text-center" placeholder="Courier Name">
                 <label class="fw-bold text-danger d-block mb-1">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off" inputmode="none">
                 <div class="d-grid gap-2 mt-3">
                     <button class="btn btn-success btn-lg fw-bold shadow" onclick="confirmSync()">COMPLETE & SYNC</button>
                     <div class="row g-2">
-                        <div class="col-6"><button class="btn btn-dark w-100" onclick="userPrint()">PRINT</button></div>
-                        <div class="col-6"><button class="btn btn-info text-white w-100" onclick="userExcel()">EXCEL</button></div>
+                        <div class="col-6"><button class="btn btn-dark w-100 py-2" onclick="userPrint()">PRINT</button></div>
+                        <div class="col-6"><button class="btn btn-info text-white w-100 py-2" onclick="userExcel()">EXCEL</button></div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-lg-7 card p-3 shadow-sm h-100 border-top border-primary border-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="text-primary m-0">Live Scan: <span id="totalCount" class="badge bg-primary">0</span></h5>
+                <h5 class="text-primary m-0">Shift Total: <span id="totalCount" class="badge bg-primary">0</span></h5>
                 <button class="btn btn-sm btn-warning fw-bold" id="toggleEdit" onclick="toggleEditMode()">EDIT LIST</button>
             </div>
             <div class="table-responsive border rounded" style="max-height: 500px;"><table class="table table-hover text-center m-0"><thead class="table-dark sticky-top"><tr><th>SL</th><th>AWB</th><th class="edit-col d-none">X</th></tr></thead><tbody id="scanBody"></tbody></table></div>
@@ -93,10 +98,30 @@
     </div>
 
     <div id="adminView">
-        <div class="row mb-3 align-items-center">
-            <div class="col-md-3"><h4>Live Dashboard</h4></div>
-            <div class="col-md-6"><div class="input-group"><input type="text" id="searchAWB" class="form-control" placeholder="🔍 Search AWB..." oninput="renderAdminUI()"><input type="date" id="filterDate" class="form-control" onchange="renderAdminUI()"></div></div>
-            <div class="col-md-3 text-end"><span class="badge bg-dark">Real-time Enabled</span></div>
+        <div class="row g-4 mb-4 align-items-stretch">
+            <div class="col-md-4">
+                <div class="card volume-card p-4 h-100 text-center shadow">
+                    <div class="volume-label mb-2">Total Parcels Scanned</div>
+                    <div class="volume-number" id="dayVolume">0</div>
+                    <div class="small mt-2" id="dayLabelText">Today's Data</div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card p-4 h-100 shadow border-start border-primary border-4">
+                    <h5>Admin Controls</h5>
+                    <hr>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Filter by Date</label>
+                            <input type="date" id="filterDate" class="form-control" onchange="renderAdminUI()">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Find AWB Number</label>
+                            <input type="text" id="searchAWB" class="form-control" placeholder="Search across all lots..." oninput="renderAdminUI()">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div id="adminGrid" class="row"></div>
     </div>
@@ -117,7 +142,7 @@
     const db = getFirestore(app);
 
     let items = [], opName = "", scanTimer, editMode = false, scannerActive = false;
-    let cloudData = []; // Local cache of database for fast filtering
+    let cloudData = []; 
     let dataVault = {}; 
     const awbModal = new bootstrap.Modal(document.getElementById('awbModal'));
 
@@ -127,13 +152,12 @@
 
     document.getElementById('filterDate').value = getLocalDate();
 
-    // LIVE SYNC LISTENER
     const startLiveSync = () => {
         const q = query(collection(db, "manifests"), orderBy("time", "asc"));
         onSnapshot(q, (snapshot) => {
             cloudData = [];
             snapshot.forEach(doc => cloudData.push({ id: doc.id, ...doc.data() }));
-            renderAdminUI(); // Auto-update dashboard when data changes
+            renderAdminUI();
         });
     };
 
@@ -174,12 +198,14 @@
         }
     };
 
-    // DASHBOARD RENDERING (Strict local date filtering)
     window.renderAdminUI = () => {
         const grid = document.getElementById('adminGrid');
         const filterVal = document.getElementById('filterDate').value;
         const searchVal = document.getElementById('searchAWB').value.trim();
         grid.innerHTML = ""; dataVault = {};
+        
+        let totalProcessedCount = 0;
+        document.getElementById('dayLabelText').innerText = filterVal === getLocalDate() ? "Today's Volume" : "Volume for " + filterVal;
 
         let dayBucket = cloudData.filter(d => {
             const ts = d.time ? d.time.toDate() : new Date();
@@ -189,17 +215,18 @@
 
         dayBucket.forEach((d, idx) => {
             const lotNo = idx + 1;
+            totalProcessedCount += d.count;
             if(searchVal && !d.awbs.some(a => a.includes(searchVal))) return;
             
             dataVault[d.id] = { ...d, lotNo, rawTs: d.time ? d.time.toDate() : new Date() };
 
             const col = document.createElement('div'); col.className = "col-md-4 mb-4";
             col.innerHTML = `
-                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3">
+                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3 ${searchVal && d.awbs.some(a => a.includes(searchVal)) ? 'found-highlight' : ''}">
                     <span class="badge bg-danger awb-count-badge">${d.count}</span>
                     <h6 class="text-center fw-bold text-primary">${getLotText(lotNo)}</h6>
                     <input type="text" class="form-control form-control-sm fw-bold border-primary mb-1 text-center" value="${d.courier}" id="inp-${d.id}">
-                    <p class="small text-muted mb-2 text-center">User: ${d.operator}</p>
+                    <p class="small text-muted mb-2 text-center">${dataVault[d.id].rawTs.toLocaleTimeString()} | User: ${d.operator}</p>
                     <div class="d-grid gap-1">
                         <div class="btn-group"><button class="btn btn-sm btn-dark" onclick="triggerExport('${d.id}', 'print')">Print</button><button class="btn btn-sm btn-info text-white" onclick="triggerExport('${d.id}', 'pdf')">PDF</button></div>
                         <button class="btn btn-sm btn-success" onclick="triggerExport('${d.id}', 'excel')">Excel</button>
@@ -207,8 +234,9 @@
                         <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${d.id}')" style="cursor:pointer">Delete Manifest</a></div>
                     </div>
                 </div>`;
-            grid.insertBefore(col, grid.firstChild); // Newest lots at top
+            grid.insertBefore(col, grid.firstChild);
         });
+        document.getElementById('dayVolume').innerText = totalProcessedCount;
     };
 
     window.triggerExport = (id, type) => {
@@ -234,7 +262,7 @@
             docPDF.save(`${fileName}.pdf`);
         } else if(type === 'excel') {
             const wb = XLSX.utils.book_new();
-            const wsData = [["LOT:", lot],["COURIER:", d.courier],[],["SL", "AWB"]];
+            const wsData = [["LOT:", lot],["COURIER:", d.courier],["DATE:", d.rawTs.toLocaleString()],[],["SL", "AWB"]];
             d.awbs.forEach((a, i) => wsData.push([i+1, a]));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Sheet1");
             XLSX.writeFile(wb, `${fileName}.xlsx`);
