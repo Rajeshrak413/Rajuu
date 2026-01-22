@@ -10,10 +10,11 @@
         :root { --medika: #004a99; --danger: #dc3545; }
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
-        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: 0.3s; }
         .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
+        .search-highlight { border: 3px solid #28a745 !important; transform: scale(1.02); }
 
         @media print {
             body * { visibility: hidden; }
@@ -98,8 +99,13 @@
     <div id="adminView">
         <div class="row mb-3 align-items-center">
             <div class="col-md-3"><h4>Admin History</h4></div>
-            <div class="col-md-6"><input type="date" id="filterDate" class="form-control" onchange="window.renderAdminUI()"></div>
-            <div class="col-md-3 text-end">Total: <b id="dayVolume" class="fs-4">0</b></div>
+            <div class="col-md-4">
+                <input type="text" id="searchAWB" class="form-control border-success" placeholder="🔍 Search AWB Number..." oninput="window.renderAdminUI()">
+            </div>
+            <div class="col-md-3">
+                <input type="date" id="filterDate" class="form-control" onchange="window.renderAdminUI()">
+            </div>
+            <div class="col-md-2 text-end">Total: <b id="dayVolume" class="fs-4">0</b></div>
         </div>
         <div id="adminGrid" class="row"></div>
     </div>
@@ -119,7 +125,6 @@
 
     let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}; 
 
-    // HELPERS
     const getFormattedDate = () => {
         const d = new Date();
         return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
@@ -164,7 +169,7 @@
         const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
         if (!cr || !items.length) return alert("Missing Info");
         await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: [...items].reverse(), count: items.length, time: serverTimestamp() });
-        items = []; renderScanList(); alert("Synced");
+        items = []; renderScanList(); alert("Synced Successfully");
     };
 
     const startLiveSync = () => {
@@ -176,13 +181,22 @@
 
     window.renderAdminUI = () => {
         const grid = document.getElementById('adminGrid');
+        const searchTerm = document.getElementById('searchAWB').value.trim().toUpperCase();
         grid.innerHTML = ""; let total = 0;
+        
         cloudData.forEach((d, idx) => {
             total += d.count; dataVault[d.id] = d;
-            const col = document.createElement('div'); col.className = "col-md-4 mb-3";
-            col.innerHTML = `<div class="card p-3 border-top border-primary border-3">
+            
+            // Search Logic: Check if any AWB in this manifest matches search
+            const hasMatch = searchTerm === "" || d.awbs.some(awb => awb.includes(searchTerm));
+            if (!hasMatch) return;
+
+            const col = document.createElement('div'); 
+            col.className = "col-md-4 mb-3";
+            col.innerHTML = `<div class="card p-3 border-top border-primary border-3 ${searchTerm !== "" ? 'search-highlight' : ''}">
                 <span class="badge bg-danger awb-count-badge">${d.count}</span>
                 <h6 class="text-center fw-bold">LOT ${idx+1} - ${d.courier}</h6>
+                <p class="small text-center text-muted mb-2">Op: ${d.operator}</p>
                 <div class="d-grid gap-1">
                     <button class="btn btn-sm btn-dark" onclick="window.triggerPrint('${d.id}')">Print</button>
                     <button class="btn btn-sm btn-success" onclick="window.triggerExcel('${d.id}')">Excel</button>
@@ -218,7 +232,7 @@
 
     window.triggerPrint = (id) => {
         const d = dataVault[id];
-        const cols = parseInt(prompt("Columns?", "2")) || 2;
+        const cols = parseInt(prompt("Columns (1-4)?", "2")) || 2;
         document.getElementById('p-courier').innerText = d.courier;
         document.getElementById('p-op').innerText = d.operator;
         document.getElementById('p-date').innerText = getFormattedDate();
@@ -236,7 +250,7 @@
         window.print();
     };
 
-    window.delManifest = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "manifests", id)); };
+    window.delManifest = async (id) => { if(confirm("Delete Manifest?")) await deleteDoc(doc(db, "manifests", id)); };
 </script>
 </body>
 </html>
