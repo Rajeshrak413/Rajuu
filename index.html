@@ -16,7 +16,7 @@
         .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; color: var(--medika); cursor: default; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
-        .found-highlight { border: 3px solid var(--edit) !important; background-color: var(--highlight) !important; transform: scale(1.02); z-index: 10; }
+        .found-highlight { border: 3px solid var(--edit) !important; background-color: var(--highlight) !important; }
 
         @media print {
             body * { visibility: hidden; }
@@ -52,7 +52,7 @@
 <nav class="navbar py-3 no-print shadow">
     <div class="container d-flex justify-content-between align-items-center">
         <h3 class="m-0 fw-bold">MEDIKA BAZAAR</h3>
-        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT</button>
+        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT / HOME</button>
     </div>
 </nav>
 
@@ -60,7 +60,7 @@
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5">
             <div class="card p-5 text-center shadow">
-                <h2 class="mb-4 text-primary fw-bold">Logistics Master</h2>
+                <h2 class="mb-4 text-primary fw-bold">Warehouse Portal</h2>
                 <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
                 <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ACCESS SYSTEM</button>
             </div>
@@ -69,22 +69,22 @@
 
     <div id="scannerView" class="row g-4">
         <div class="col-lg-5">
-            <div class="card p-4 shadow-sm mb-3 text-center border-top border-primary">
+            <div class="card p-4 shadow-sm mb-3 text-center border-top border-primary border-3">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
                 <input type="text" id="courierType" class="form-control mb-3 text-center fw-bold" placeholder="Courier Name">
                 <label class="fw-bold text-danger d-block mb-1">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off" inputmode="none">
                 <div class="d-grid gap-2 mt-3">
-                    <button id="syncBtn" class="btn btn-success btn-lg fw-bold shadow" onclick="confirmSync()">COMPLETE & SYNC</button>
+                    <button class="btn btn-success btn-lg fw-bold shadow" onclick="confirmSync()">COMPLETE & SYNC</button>
                     <div class="row g-2">
-                        <div class="col-6"><button class="btn btn-dark w-100 py-2" onclick="preparePrintCurrent()">PRINT</button></div>
-                        <div class="col-6"><button class="btn btn-info text-white w-100 py-2" onclick="downloadExcelUser()">EXCEL</button></div>
+                        <div class="col-6"><button class="btn btn-dark w-100" onclick="window.userPrint()">PRINT</button></div>
+                        <div class="col-6"><button class="btn btn-info text-white w-100" onclick="window.userExcel()">EXCEL</button></div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-lg-7">
-            <div class="card p-3 shadow-sm h-100 border-top border-primary">
+            <div class="card p-3 shadow-sm h-100 border-top border-primary border-3">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="text-primary m-0">Live Scan: <span id="totalCount" class="badge bg-primary">0</span></h5>
                     <button class="btn btn-sm btn-warning fw-bold" id="toggleEdit" onclick="toggleEditMode()">EDIT LIST</button>
@@ -101,7 +101,7 @@
 
     <div id="adminView">
         <div class="row mb-3 align-items-center">
-            <div class="col-md-3"><h4>Admin Panel</h4></div>
+            <div class="col-md-3"><h4>Admin Dashboard</h4></div>
             <div class="col-md-6">
                 <div class="input-group">
                     <input type="text" id="searchAWB" class="form-control" placeholder="🔍 Search AWB Number..." oninput="loadAdminData()">
@@ -111,7 +111,7 @@
             <div class="col-md-3 text-end"><button class="btn btn-primary btn-sm" onclick="loadAdminData()">Refresh</button></div>
         </div>
         <div class="card p-3 mb-4 shadow-sm text-center bg-white border-start border-primary border-4">
-            <h5 class="m-0 text-uppercase">TOTAL PROCESSED: <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
+            <h5 class="m-0 text-uppercase">BUCKET TOTAL: <span id="totalVolumeCount" class="fw-bold text-primary">0</span></h5>
         </div>
         <div id="adminGrid" class="row"></div>
     </div>
@@ -135,28 +135,18 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    
     let items = [];
     let opName = "";
     let scanTimer;
     let editMode = false;
     let scannerActive = false;
+    let adminDataStore = {}; // Central Data Repository for Admin Buttons
 
-    // Helper: Formats Date for Filenames (DD-MM-YYYY)
-    const getFileFormatDate = (dObj) => {
-        const d = dObj || new Date();
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
+    const getLocalDate = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const getFileDate = (d = new Date()) => String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
 
-    const getBucketDate = () => {
-        const d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    };
-
-    const initFilter = () => { document.getElementById('filterDate').value = getBucketDate(); };
-    initFilter();
+    document.getElementById('filterDate').value = getLocalDate();
 
     window.autoFocusScanner = () => { if(scannerActive && !editMode) document.getElementById('awbInput').focus(); };
 
@@ -177,53 +167,37 @@
         if(val.length < 5) return;
         clearTimeout(scanTimer);
         scanTimer = setTimeout(() => {
-            if (items.includes(val)) {
-                document.getElementById('sndPolice').play();
-                alert("🚨 DUPLICATE DETECTED!\n" + val);
-            } else {
-                document.getElementById('sndScan').play();
-                items.push(val);
-                renderScanList();
-            }
+            if (items.includes(val)) { document.getElementById('sndPolice').play(); alert("DUPLICATE!"); }
+            else { document.getElementById('sndScan').play(); items.push(val); renderScanList(); }
             e.target.value = '';
         }, 250);
     });
 
     function renderScanList() {
         document.getElementById('scanBody').innerHTML = items.map((a, i) => 
-            `<tr><td>${i+1}</td><td class="fw-bold text-dark">${a}</td><td class="edit-col ${editMode ? '' : 'd-none'}"><button class="btn btn-sm btn-danger" onclick="window.del(${i})">X</button></td></tr>`
+            `<tr><td>${i+1}</td><td class="fw-bold">${a}</td><td class="edit-col ${editMode ? '' : 'd-none'}"><button class="btn btn-sm btn-danger" onclick="window.del(${i})">X</button></td></tr>`
         ).join('');
         document.getElementById('totalCount').innerText = items.length;
     }
 
-    window.toggleEditMode = () => {
-        editMode = !editMode;
-        document.getElementById('toggleEdit').innerText = editMode ? "SAVE LIST" : "EDIT LIST";
-        renderScanList();
-    };
-
+    window.toggleEditMode = () => { editMode = !editMode; document.getElementById('toggleEdit').innerText = editMode ? "SAVE" : "EDIT"; renderScanList(); };
     window.del = (i) => { items.splice(i, 1); renderScanList(); };
 
     window.confirmSync = async () => {
         const cr = document.getElementById('courierType').value || "GENERAL";
-        if (items.length === 0) return alert("Nothing to sync");
+        if (items.length === 0) return alert("Empty");
         if (confirm(`Sync ${items.length} AWBs for ${cr}?`)) {
             await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
-            alert("✅ Synced Successfully!"); 
-            items = []; renderScanList();
-            initFilter();
-            if(document.getElementById('adminView').style.display === 'block') loadAdminData();
+            alert("Synced!"); items = []; renderScanList(); loadAdminData();
         }
     };
 
-    // UPDATED EXPORT ENGINE (Date First Naming)
-    window.runExport = (type, data) => {
+    // --- CENTRAL EXPORT ENGINE ---
+    window.processExport = (id, type) => {
+        const data = adminDataStore[id];
+        if(!data) return;
         const { courier, operator, date, count, awbs, rawDate } = data;
-        
-        // Sequence: Date_CourierType
-        const formattedDate = getFileFormatDate(rawDate);
-        const safeCourier = courier.replace(/\s+/g, '_');
-        const fileName = `${formattedDate}_${safeCourier}`;
+        const fileName = `${getFileDate(rawDate)}_${courier.replace(/\s+/g, '_')}`;
 
         if(type === 'print') {
             document.getElementById('p-courier').innerText = courier;
@@ -235,15 +209,15 @@
             document.getElementById('p-body-2').innerHTML = awbs.slice(mid).map((a, i) => `<tr><td>${mid+i+1}</td><td>${a}</td></tr>`).join('');
             window.print();
         } else if(type === 'pdf') {
-            const { jsPDF } = window.jspdf; const doc = new jsPDF();
-            doc.setFontSize(10); doc.text("MEDIKA BAZAAR LOGISTICS", 105, 10, { align: "center" });
-            doc.setFontSize(40); doc.text(courier.toUpperCase(), 15, 35);
-            doc.circle(180, 30, 15); doc.setFontSize(20); doc.text(count.toString(), 180, 32, { align: "center" });
-            doc.line(15, 45, 195, 45); doc.setFontSize(11); doc.text(`Op: ${operator} | Date: ${date}`, 15, 52);
+            const { jsPDF } = window.jspdf; const docPDF = new jsPDF();
+            docPDF.setFontSize(10); docPDF.text("MEDIKA BAZAAR LOGISTICS", 105, 10, { align: "center" });
+            docPDF.setFontSize(40); docPDF.text(courier.toUpperCase(), 15, 35);
+            docPDF.circle(180, 30, 15); docPDF.setFontSize(20); docPDF.text(count.toString(), 180, 32, { align: "center" });
+            docPDF.line(15, 45, 195, 45); docPDF.setFontSize(11); docPDF.text(`Op: ${operator} | Date: ${date}`, 15, 52);
             const mid = Math.ceil(awbs.length / 2);
-            doc.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i+1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
-            doc.autoTable({ body: awbs.slice(mid).map((a, i) => [mid+i+1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
-            doc.save(`${fileName}.pdf`);
+            docPDF.autoTable({ body: awbs.slice(0, mid).map((a, i) => [i+1, a]), startY: 60, margin: { right: 105 }, theme: 'grid' });
+            docPDF.autoTable({ body: awbs.slice(mid).map((a, i) => [mid+i+1, a]), startY: 60, margin: { left: 105 }, theme: 'grid' });
+            docPDF.save(`${fileName}.pdf`);
         } else if(type === 'excel') {
             const wb = XLSX.utils.book_new();
             const wsData = [["SL", "AWB NUMBER"]]; awbs.forEach((a, i) => wsData.push([i+1, a]));
@@ -254,53 +228,64 @@
 
     window.loadAdminData = async () => {
         const grid = document.getElementById('adminGrid');
-        grid.innerHTML = "<p class='p-5 text-center'>Syncing bucket...</p>";
-        const filterDate = document.getElementById('filterDate').value;
-        const searchAWB = document.getElementById('searchAWB').value.trim();
-        const q = query(collection(db, "manifests"), orderBy("time", "desc"));
-        const snap = await getDocs(q);
-        grid.innerHTML = ""; let totalVol = 0;
+        grid.innerHTML = "<p class='p-5 text-center'>Refreshing Bucket...</p>";
+        const fDate = document.getElementById('filterDate').value;
+        const search = document.getElementById('searchAWB').value.trim();
+        const snap = await getDocs(query(collection(db, "manifests"), orderBy("time", "desc")));
+        grid.innerHTML = ""; let vol = 0; adminDataStore = {};
 
         snap.forEach(docSnap => {
             const d = docSnap.data();
             const ts = d.time ? d.time.toDate() : new Date();
-            const recLocalDate = ts.getFullYear() + '-' + String(ts.getMonth() + 1).padStart(2, '0') + '-' + String(ts.getDate()).padStart(2, '0');
-            if (!searchAWB && filterDate && recLocalDate !== filterDate) return;
-            const containsAWB = searchAWB ? d.awbs.some(awb => awb.includes(searchAWB)) : true;
-            if (searchAWB && !containsAWB) return;
-            totalVol += d.count;
+            const recordDate = getLocalDate(ts);
 
-            const cardData = JSON.stringify({ courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs, rawDate: ts });
+            if (!search && fDate && recordDate !== fDate) return;
+            if (search && !d.awbs.some(a => a.includes(search))) return;
+
+            vol += d.count;
+            const id = docSnap.id;
+            adminDataStore[id] = { courier: d.courier, operator: d.operator, date: ts.toLocaleString(), count: d.count, awbs: d.awbs, rawDate: ts };
+
             const col = document.createElement('div');
             col.className = "col-md-4 mb-4";
             col.innerHTML = `
-                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary ${searchAWB ? 'found-highlight' : ''}">
+                <div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3 ${search ? 'found-highlight' : ''}">
                     <span class="badge bg-danger awb-count-badge">${d.count}</span>
-                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-1" value="${d.courier}" id="inp-${docSnap.id}">
-                    <p class="small text-muted mb-2">${ts.toLocaleTimeString()} | User: ${d.operator}</p>
+                    <input type="text" class="form-control form-control-sm fw-bold border-primary mb-1" value="${d.courier}" id="inp-${id}">
+                    <p class="small text-muted mb-2">${ts.toLocaleTimeString()} | Op: ${d.operator}</p>
                     <div class="d-grid gap-1">
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-dark" onclick='runExport("print", ${cardData})'>Print</button>
-                            <button class="btn btn-sm btn-info text-white" onclick='runExport("pdf", ${cardData})'>PDF</button>
+                            <button class="btn btn-sm btn-dark" onclick="processExport('${id}', 'print')">Print</button>
+                            <button class="btn btn-sm btn-info text-white" onclick="processExport('${id}', 'pdf')">PDF</button>
                         </div>
-                        <button class="btn btn-sm btn-success" onclick='runExport("excel", ${cardData})'>Excel Export</button>
-                        <button class="btn btn-sm btn-warning fw-bold" onclick="updateC('${docSnap.id}')">Update Courier</button>
-                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${docSnap.id}')" style="cursor:pointer">Delete</a></div>
+                        <button class="btn btn-sm btn-success" onclick="processExport('${id}', 'excel')">Excel</button>
+                        <button class="btn btn-sm btn-warning fw-bold" onclick="updateC('${id}')">Update Name</button>
+                        <div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${id}')" style="cursor:pointer">Delete</a></div>
                     </div>
                 </div>`;
             grid.appendChild(col);
         });
-        document.getElementById('totalVolumeCount').innerText = totalVol;
+        document.getElementById('totalVolumeCount').innerText = vol;
     };
 
     window.updateC = async (id) => {
         await updateDoc(doc(db, "manifests", id), { courier: document.getElementById(`inp-${id}`).value });
-        alert("Courier Name Updated!"); loadAdminData();
+        alert("Updated!"); loadAdminData();
     };
 
-    window.deleteRec = async (id) => { if(confirm("Permanently delete?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
-    window.preparePrintCurrent = () => window.runExport("print", { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date() });
-    window.downloadExcelUser = () => window.runExport("excel", { courier: document.getElementById('courierType').value || "Manifest", awbs: items, rawDate: new Date() });
+    window.deleteRec = async (id) => { if(confirm("Delete manifest?")) { await deleteDoc(doc(db, "manifests", id)); loadAdminData(); } };
+
+    // Scanner View Helpers
+    window.userPrint = () => {
+        const id = 'user-current';
+        adminDataStore[id] = { courier: document.getElementById('courierType').value || "GEN", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date() };
+        window.processExport(id, 'print');
+    };
+    window.userExcel = () => {
+        const id = 'user-current';
+        adminDataStore[id] = { courier: document.getElementById('courierType').value || "Manifest", operator: opName, date: new Date().toLocaleString(), count: items.length, awbs: items, rawDate: new Date() };
+        window.processExport(id, 'excel');
+    };
 </script>
 </body>
 </html>
