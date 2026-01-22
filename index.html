@@ -11,14 +11,10 @@
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
-        /* Scanner Styling */
         .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.3s; }
         .scan-ready { border-color: var(--medika) !important; background: var(--ready) !important; }
-        
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
-
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
@@ -67,7 +63,6 @@
         <div class="col-lg-5">
             <div class="card p-4 shadow-sm text-center border-top border-primary border-3">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                
                 <label class="fw-bold text-primary mb-1">1. SELECT COURIER FIRST</label>
                 <select id="courierSelect" class="form-select form-select-lg mb-2 fw-bold text-center border-primary" onchange="window.handleCourierChange()">
                     <option value="">-- SELECT COURIER --</option>
@@ -80,10 +75,10 @@
                     <option value="OTHER">OTHER (MANUAL)</option>
                 </select>
                 <input type="text" id="manualCourier" class="form-control mb-3 fw-bold text-center d-none" placeholder="Type Courier Name" oninput="window.validateScanner()">
-                
+
                 <label class="fw-bold text-danger d-block mb-1 mt-2">2. SCAN AWB NUMBER</label>
-                <input type="text" id="awbInput" class="form-control scan-input" placeholder="LOCKED" autocomplete="off" disabled>
-                
+                <input type="text" id="awbInput" inputmode="none" class="form-control scan-input" placeholder="LOCKED" autocomplete="off" disabled>
+
                 <div class="d-grid gap-2 mt-3">
                     <button class="btn btn-success btn-lg fw-bold" onclick="window.confirmSync()">COMPLETE & SYNC</button>
                     <div class="row g-2">
@@ -171,7 +166,6 @@
         document.getElementById(id).style.display = 'block'; 
     }
 
-    // LOCK / UNLOCK SCANNER LOGIC
     window.handleCourierChange = () => {
         const s = document.getElementById('courierSelect');
         const m = document.getElementById('manualCourier');
@@ -183,9 +177,8 @@
         const s = document.getElementById('courierSelect').value;
         const m = document.getElementById('manualCourier').value.trim();
         const input = document.getElementById('awbInput');
-        
         const isCourierSet = (s !== "" && s !== "OTHER") || (s === "OTHER" && m !== "");
-        
+
         if(isCourierSet) {
             input.disabled = false;
             input.placeholder = "READY TO SCAN";
@@ -201,19 +194,28 @@
 
     window.autoFocusScanner = () => { 
         const input = document.getElementById('awbInput');
+        // Auto-focus keeping keyboard hidden via inputmode="none"
         if(scannerActive && !input.disabled && !document.querySelector('.modal.show')) {
             input.focus();
         }
     };
 
-    document.getElementById('awbInput').addEventListener('input', (e) => {
-        const val = e.target.value.trim().toUpperCase();
-        if(val.length < 4) return;
-        setTimeout(() => {
-            if (items.includes(val)) { document.getElementById('sndPolice').play(); alert("DUPLICATE!"); }
-            else { document.getElementById('sndScan').play(); items.unshift(val); renderScanList(); }
-            e.target.value = '';
-        }, 200);
+    // Optimized for Hardware Scanners (Detects the 'Enter' key they send)
+    document.getElementById('awbInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const val = e.target.value.trim().toUpperCase();
+            if(val.length < 3) return; 
+
+            if (items.includes(val)) { 
+                document.getElementById('sndPolice').play(); 
+                alert("DUPLICATE!"); 
+            } else { 
+                document.getElementById('sndScan').play(); 
+                items.unshift(val); 
+                renderScanList(); 
+            }
+            e.target.value = ''; // Reset for next scan
+        }
     });
 
     function renderScanList() {
@@ -247,7 +249,7 @@
         const selectedDate = document.getElementById('filterDate').value;
         const searchTerm = document.getElementById('searchAWB').value.trim().toUpperCase();
         grid.innerHTML = ""; let total = 0;
-        
+
         cloudData.forEach((d, idx) => {
             const manifestDate = d.creationDay || (d.time ? getISODate(d.time.toDate()) : "");
             if(manifestDate !== selectedDate) return;
@@ -359,7 +361,7 @@
             }
         } else { alert("Access Denied."); }
     };
-    
+
     window.userPrint = () => { const mockId = 'temp'; dataVault[mockId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length }; window.triggerPrint(mockId); };
 </script>
 </body>
