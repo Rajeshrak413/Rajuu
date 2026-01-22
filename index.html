@@ -13,7 +13,6 @@
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        /* Keyboard-free scan input styling */
         .scan-input { font-size: 2.2rem; height: 90px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; cursor: default; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
@@ -21,10 +20,15 @@
         .volume-card { background: linear-gradient(135deg, #004a99 0%, #007bff 100%); color: white; }
         .volume-number { font-size: 3.5rem; font-weight: 800; line-height: 1; }
 
+        /* PRINT LAYOUT WITH BORDER */
         @media print {
+            @page { margin: 10mm; }
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
-            #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; background: white; }
+            #printView { 
+                position: absolute; left: 0; top: 0; width: 100%; display: block !important; background: white; 
+                border: 4px solid black; padding: 15px; box-sizing: border-box; min-height: 98vh;
+            }
             .lot-header-center { font-size: 28pt !important; font-weight: 900; text-align: center; text-transform: uppercase; text-decoration: underline; margin-bottom: 5px; display: block; }
             .p-medika-title { font-size: 16pt; text-align: center; letter-spacing: 5px; margin: 0; font-weight: bold; }
             .print-main-row { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
@@ -50,7 +54,11 @@
         <span><strong>Op:</strong> <span id="p-op"></span></span>
         <span><strong>Date:</strong> <span id="p-date"></span></span>
     </div>
-    <div class="print-grid"><table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody id="p-body-1"></tbody></table><table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody id="p-body-2"></tbody></table></div>
+    <div class="print-grid">
+        <table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody id="p-body-1"></tbody></table>
+        <table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody id="p-body-2"></tbody></table>
+    </div>
+    <div style="margin-top: 20px; text-align: right; font-style: italic; font-size: 10pt;">Generated via Medika Logistics Master</div>
 </div>
 
 <nav class="navbar py-3 no-print shadow">
@@ -66,10 +74,8 @@
             <div class="card p-4 shadow-sm mb-3 border-top border-primary border-3 text-center">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
                 <input type="text" id="courierType" class="form-control mb-3 fw-bold text-center border-primary" placeholder="Type or Scan Courier Name">
-                
                 <label class="fw-bold text-danger d-block mb-1">SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" class="form-control scan-input" placeholder="READY" autocomplete="off" inputmode="none">
-                
                 <div class="d-grid gap-2 mt-3">
                     <button class="btn btn-success btn-lg fw-bold shadow" onclick="confirmSync()">COMPLETE & SYNC</button>
                     <div class="row g-2">
@@ -94,15 +100,14 @@
                 <div class="card volume-card p-4 h-100 text-center shadow">
                     <div class="small text-uppercase opacity-75">Daily Scan Volume</div>
                     <div class="volume-number" id="dayVolume">0</div>
-                    <div class="small mt-2" id="dayLabelText">Today</div>
                 </div>
             </div>
             <div class="col-md-8">
                 <div class="card p-4 h-100 shadow border-start border-primary border-4">
-                    <h5>Bucket Controls</h5>
+                    <h5>Admin Controls</h5>
                     <div class="row g-3 mt-1">
-                        <div class="col-md-6"><label class="small fw-bold">Select Date</label><input type="date" id="filterDate" class="form-control" onchange="renderAdminUI()"></div>
-                        <div class="col-md-6"><label class="small fw-bold">Search AWB</label><input type="text" id="searchAWB" class="form-control" placeholder="Search across lots..." oninput="renderAdminUI()"></div>
+                        <div class="col-md-6"><label class="small fw-bold">Bucket Date</label><input type="date" id="filterDate" class="form-control" onchange="renderAdminUI()"></div>
+                        <div class="col-md-6"><label class="small fw-bold">AWB Search</label><input type="text" id="searchAWB" class="form-control" placeholder="Search across lots..." oninput="renderAdminUI()"></div>
                     </div>
                 </div>
             </div>
@@ -133,8 +138,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    let items = [], opName = "", scanTimer, editMode = false, scannerActive = false;
-    let cloudData = [], dataVault = {}; 
+    let items = [], opName = "", scanTimer, editMode = false, scannerActive = false, cloudData = [], dataVault = {}; 
     const awbModal = new bootstrap.Modal(document.getElementById('awbModal'));
 
     const getLocalDate = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -177,8 +181,8 @@
 
     window.confirmSync = async () => {
         const cr = document.getElementById('courierType').value.trim() || "GENERAL";
-        if (items.length === 0) return alert("Nothing Scanned");
-        if (confirm(`Confirm Sync for ${cr}?`)) {
+        if (items.length === 0) return alert("Empty");
+        if (confirm(`Sync ${items.length} AWBs?`)) {
             await addDoc(collection(db, "manifests"), { operator: opName, courier: cr, awbs: items, count: items.length, time: serverTimestamp() });
             alert("Synced!"); items = []; renderScanList(); document.getElementById('courierType').value = "";
         }
@@ -188,19 +192,17 @@
         const grid = document.getElementById('adminGrid');
         const filterVal = document.getElementById('filterDate').value;
         const searchVal = document.getElementById('searchAWB').value.trim();
-        grid.innerHTML = ""; dataVault = {}; let totalCount = 0;
-        
+        grid.innerHTML = ""; let total = 0;
         let dayBucket = cloudData.filter(d => getLocalDate(d.time ? d.time.toDate() : new Date()) === filterVal);
         dayBucket.forEach((d, idx) => {
-            const lotNo = idx + 1;
-            totalCount += d.count;
+            const lotNo = idx + 1; total += d.count;
             if(searchVal && !d.awbs.some(a => a.includes(searchVal))) return;
             dataVault[d.id] = { ...d, lotNo, rawTs: d.time ? d.time.toDate() : new Date() };
             const col = document.createElement('div'); col.className = "col-md-4 mb-4";
-            col.innerHTML = `<div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3"><span class="badge bg-danger awb-count-badge">${d.count}</span><h6 class="text-center fw-bold text-primary">${getLotText(lotNo)}</h6><input type="text" class="form-control form-control-sm fw-bold border-primary mb-1 text-center" value="${d.courier}" id="inp-${d.id}"><p class="small text-muted mb-2 text-center">${dataVault[d.id].rawTs.toLocaleTimeString()}</p><div class="d-grid gap-1"><div class="btn-group"><button class="btn btn-sm btn-dark" onclick="triggerExport('${d.id}', 'print')">Print</button><button class="btn btn-sm btn-info text-white" onclick="triggerExport('${d.id}', 'pdf')">PDF</button></div><button class="btn btn-sm btn-success" onclick="triggerExport('${d.id}', 'excel')">Excel</button><div class="btn-group"><button class="btn btn-sm btn-outline-dark" onclick="openAwbEdit('${d.id}')">Edit AWBs</button><button class="btn btn-sm btn-warning" onclick="updateCourier('${d.id}')">Save Name</button></div><div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${d.id}')" style="cursor:pointer">Delete Manifest</a></div></div></div>`;
+            col.innerHTML = `<div class="card admin-card p-3 h-100 shadow-sm border-top border-primary border-3"><span class="badge bg-danger awb-count-badge">${d.count}</span><h6 class="text-center fw-bold text-primary">${getLotText(lotNo)}</h6><input type="text" class="form-control form-control-sm fw-bold mb-1 text-center" value="${d.courier}" id="inp-${d.id}"><p class="small text-muted mb-2 text-center">${dataVault[d.id].rawTs.toLocaleTimeString()}</p><div class="d-grid gap-1"><div class="btn-group"><button class="btn btn-sm btn-dark" onclick="triggerExport('${d.id}', 'print')">Print</button><button class="btn btn-sm btn-info text-white" onclick="triggerExport('${d.id}', 'pdf')">PDF</button></div><button class="btn btn-sm btn-success" onclick="triggerExport('${d.id}', 'excel')">Excel</button><div class="btn-group"><button class="btn btn-sm btn-outline-dark" onclick="openAwbEdit('${d.id}')">Edit AWBs</button><button class="btn btn-sm btn-warning" onclick="updateCourier('${d.id}')">Save</button></div><div class="text-center mt-2"><a class="text-danger small" onclick="deleteRec('${d.id}')" style="cursor:pointer">Delete</a></div></div></div>`;
             grid.insertBefore(col, grid.firstChild);
         });
-        document.getElementById('dayVolume').innerText = totalCount;
+        document.getElementById('dayVolume').innerText = total;
     };
 
     window.triggerExport = (id, type) => {
@@ -216,15 +218,16 @@
             window.print();
         } else if(type === 'pdf') {
             const { jsPDF } = window.jspdf; const docPDF = new jsPDF();
-            docPDF.setFontSize(16); docPDF.text(lot, 105, 12, { align: "center" });
-            docPDF.setFontSize(40); docPDF.text(d.courier.toUpperCase(), 15, 40);
-            docPDF.circle(180, 35, 15); docPDF.setFontSize(20); docPDF.text(d.count.toString(), 180, 37, { align: "center" });
-            docPDF.autoTable({ body: d.awbs.slice(0, Math.ceil(d.awbs.length/2)).map((a,i)=>[i+1,a]), startY: 65, margin: { right: 105 }, theme: 'grid' });
-            docPDF.autoTable({ body: d.awbs.slice(Math.ceil(d.awbs.length/2)).map((a,i)=>[Math.ceil(d.awbs.length/2)+i+1,a]), startY: 65, margin: { left: 105 }, theme: 'grid' });
+            docPDF.rect(5, 5, 200, 287); // PDF Border
+            docPDF.setFontSize(16); docPDF.text(lot, 105, 15, { align: "center" });
+            docPDF.setFontSize(40); docPDF.text(d.courier.toUpperCase(), 15, 45);
+            docPDF.circle(180, 40, 15); docPDF.setFontSize(20); docPDF.text(d.count.toString(), 180, 42, { align: "center" });
+            docPDF.autoTable({ body: d.awbs.slice(0, Math.ceil(d.awbs.length/2)).map((a,i)=>[i+1,a]), startY: 70, margin: { right: 105 }, theme: 'grid' });
+            docPDF.autoTable({ body: d.awbs.slice(Math.ceil(d.awbs.length/2)).map((a,i)=>[Math.ceil(d.awbs.length/2)+i+1,a]), startY: 70, margin: { left: 105 }, theme: 'grid' });
             docPDF.save(`${d.courier}.pdf`);
         } else if(type === 'excel') {
             const wb = XLSX.utils.book_new();
-            const wsData = [["LOT:", lot],["COURIER:", d.courier],["DATE:", d.rawTs.toLocaleString()],[],["SL", "AWB"]];
+            const wsData = [["LOT:", lot],["COURIER:", d.courier],["AWBs:", d.count],[],["SL", "AWB"]];
             d.awbs.forEach((a, i) => wsData.push([i+1, a]));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
             XLSX.writeFile(wb, `${d.courier}.xlsx`);
@@ -236,17 +239,14 @@
         document.getElementById('modalTableBody').innerHTML = d.awbs.map((awb, i) => `<tr><td>${awb}</td><td><button class="btn btn-danger btn-sm" onclick="removeAwb('${id}', ${i})">X</button></td></tr>`).join('');
         awbModal.show();
     };
-
     window.removeAwb = async (mid, idx) => {
-        if(!confirm("Remove AWB?")) return;
         const d = dataVault[mid]; d.awbs.splice(idx, 1);
         await updateDoc(doc(db, "manifests", mid), { awbs: d.awbs, count: d.awbs.length });
         awbModal.hide();
     };
-
     window.updateCourier = async (id) => { await updateDoc(doc(db, "manifests", id), { courier: document.getElementById(`inp-${id}`).value }); alert("Updated!"); };
-    window.deleteRec = async (id) => { if(confirm("Delete Manifest?")) { await deleteDoc(doc(db, "manifests", id)); } };
-
+    window.deleteRec = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "manifests", id)); };
+    
     window.userPrint = () => { const id='usr'; dataVault[id]={courier:document.getElementById('courierType').value||"GEN", operator:opName, rawTs:new Date(), count:items.length, awbs:items, lotNo:0}; window.triggerExport(id,'print'); };
     window.userExcel = () => { const id='usr'; dataVault[id]={courier:document.getElementById('courierType').value||"Manifest", operator:opName, rawTs:new Date(), count:items.length, awbs:items, lotNo:0}; window.triggerExport(id,'excel'); };
 </script>
