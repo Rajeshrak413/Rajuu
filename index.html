@@ -10,11 +10,10 @@
         :root { --medika: #004a99; --danger: #dc3545; }
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
-        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: 0.3s; }
+        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid var(--medika); text-align: center; font-weight: bold; background: #fffde7; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
-        .search-highlight { border: 3px solid #28a745 !important; transform: scale(1.02); }
 
         @media print {
             body * { visibility: hidden; }
@@ -31,7 +30,7 @@
 <body onclick="window.autoFocusScanner()">
 
 <div id="printView">
-    <div class="text-center text-decoration-underline h2 fw-bold" id="p-lot"></div>
+    <div class="text-center text-decoration-underline h2 fw-bold">MANIFEST LOT</div>
     <div class="text-center fw-bold">MEDIKA BAZAAR</div>
     <div class="d-flex justify-content-between align-items-center mt-3">
         <div class="p-courier-left" id="p-courier"></div>
@@ -99,15 +98,50 @@
     <div id="adminView">
         <div class="row mb-3 align-items-center">
             <div class="col-md-3"><h4>Admin History</h4></div>
-            <div class="col-md-4">
-                <input type="text" id="searchAWB" class="form-control border-success" placeholder="🔍 Search AWB Number..." oninput="window.renderAdminUI()">
-            </div>
-            <div class="col-md-3">
-                <input type="date" id="filterDate" class="form-control" onchange="window.renderAdminUI()">
-            </div>
+            <div class="col-md-4"><input type="text" id="searchAWB" class="form-control border-success" placeholder="🔍 Search AWB Number..." oninput="window.renderAdminUI()"></div>
+            <div class="col-md-3"><input type="date" id="filterDate" class="form-control" onchange="window.renderAdminUI()"></div>
             <div class="col-md-2 text-end">Total: <b id="dayVolume" class="fs-4">0</b></div>
         </div>
         <div id="adminGrid" class="row"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="adminModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">Manage Manifest Content</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 p-3 bg-light rounded">
+                    <h6>Change Courier Type</h6>
+                    <select id="editCourierType" class="form-select fw-bold">
+                        <option value="ST COURIER">ST COURIER</option>
+                        <option value="BLUEDART">BLUEDART</option>
+                        <option value="XPRESS BEES">XPRESS BEES</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="DELIVERY">DELIVERY</option>
+                        <option value="B TO B">B TO B</option>
+                    </select>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle text-center">
+                        <thead class="table-dark"><tr><th>AWB Number</th><th>Action</th></tr></thead>
+                        <tbody id="modalTableBody"></tbody>
+                        <tfoot>
+                            <tr class="table-primary">
+                                <td><input type="text" id="newAwbInput" class="form-control text-center fw-bold" placeholder="Type Missing AWB"></td>
+                                <td><button class="btn btn-primary w-100" onclick="window.addNewAwb()">+ ADD AWB</button></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success w-100 fw-bold" onclick="window.saveManifestChanges()">SAVE ALL CHANGES</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -123,7 +157,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}; 
+    let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}, activeManifestId = null; 
+    const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
 
     const getFormattedDate = () => {
         const d = new Date();
@@ -132,9 +167,9 @@
 
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
-        if(!val) return alert("Enter Name");
         if(val === "0000") { showState('adminView'); startLiveSync(); }
-        else { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); scannerActive = true; window.autoFocusScanner(); }
+        else if(val) { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); scannerActive = true; window.autoFocusScanner(); }
+        else { alert("Enter Name"); }
     };
 
     function showState(id) { 
@@ -147,7 +182,7 @@
         document.getElementById('manualCourier').classList.toggle('d-none', s.value !== "OTHER");
     };
 
-    window.autoFocusScanner = () => { if(scannerActive) document.getElementById('awbInput').focus(); };
+    window.autoFocusScanner = () => { if(scannerActive && !document.querySelector('.modal.show')) document.getElementById('awbInput').focus(); };
 
     document.getElementById('awbInput').addEventListener('input', (e) => {
         const val = e.target.value.trim().toUpperCase();
@@ -185,22 +220,20 @@
         grid.innerHTML = ""; let total = 0;
         
         cloudData.forEach((d, idx) => {
-            total += d.count; dataVault[d.id] = d;
-            
-            // Search Logic: Check if any AWB in this manifest matches search
+            total += d.count; dataVault[d.id] = JSON.parse(JSON.stringify(d)); // Deep copy
             const hasMatch = searchTerm === "" || d.awbs.some(awb => awb.includes(searchTerm));
             if (!hasMatch) return;
 
             const col = document.createElement('div'); 
             col.className = "col-md-4 mb-3";
-            col.innerHTML = `<div class="card p-3 border-top border-primary border-3 ${searchTerm !== "" ? 'search-highlight' : ''}">
+            col.innerHTML = `<div class="card p-3 border-top border-primary border-3">
                 <span class="badge bg-danger awb-count-badge">${d.count}</span>
                 <h6 class="text-center fw-bold">LOT ${idx+1} - ${d.courier}</h6>
-                <p class="small text-center text-muted mb-2">Op: ${d.operator}</p>
                 <div class="d-grid gap-1">
                     <button class="btn btn-sm btn-dark" onclick="window.triggerPrint('${d.id}')">Print</button>
+                    <button class="btn btn-sm btn-outline-dark" onclick="window.openAdminEditor('${d.id}')">Manage Manifest</button>
                     <button class="btn btn-sm btn-success" onclick="window.triggerExcel('${d.id}')">Excel</button>
-                    <button class="btn btn-sm btn-danger" onclick="window.delManifest('${d.id}')">Delete</button>
+                    <button class="btn btn-sm btn-danger" onclick="window.delManifest('${d.id}')">Delete Lot</button>
                 </div>
             </div>`;
             grid.prepend(col);
@@ -208,10 +241,52 @@
         document.getElementById('dayVolume').innerText = total;
     };
 
+    // ADMIN EDITOR LOGIC
+    window.openAdminEditor = (id) => {
+        activeManifestId = id;
+        const d = dataVault[id];
+        document.getElementById('editCourierType').value = d.courier;
+        renderModalTable();
+        adminModal.show();
+    };
+
+    function renderModalTable() {
+        const d = dataVault[activeManifestId];
+        document.getElementById('modalTableBody').innerHTML = d.awbs.map((a, i) => `
+            <tr>
+                <td><input type="text" class="form-control text-center fw-bold" value="${a}" oninput="window.updateAwbValue(${i}, this.value)"></td>
+                <td><button class="btn btn-sm btn-danger" onclick="window.removeAwbFromManifest(${i})">Remove</button></td>
+            </tr>
+        `).join('');
+    }
+
+    window.updateAwbValue = (idx, val) => { dataVault[activeManifestId].awbs[idx] = val.trim().toUpperCase(); };
+    window.removeAwbFromManifest = (idx) => { dataVault[activeManifestId].awbs.splice(idx, 1); renderModalTable(); };
+    window.addNewAwb = () => {
+        const val = document.getElementById('newAwbInput').value.trim().toUpperCase();
+        if(!val) return;
+        dataVault[activeManifestId].awbs.push(val);
+        document.getElementById('newAwbInput').value = "";
+        renderModalTable();
+    };
+
+    window.saveManifestChanges = async () => {
+        const d = dataVault[activeManifestId];
+        const newCourier = document.getElementById('editCourierType').value;
+        await updateDoc(doc(db, "manifests", activeManifestId), {
+            courier: newCourier,
+            awbs: d.awbs,
+            count: d.awbs.length
+        });
+        adminModal.hide();
+        alert("Manifest Updated!");
+    };
+
+    // EXPORTS
     window.triggerExcel = (id) => {
         const d = dataVault[id];
         const fileName = `${getFormattedDate()}_${d.courier.replace(/\s+/g, '_')}.xlsx`;
-        const wsData = [["COURIER:", d.courier], ["OPERATOR:", d.operator], ["DATE:", getFormattedDate()], [], ["SL", "AWB NUMBER"]];
+        const wsData = [["COURIER:", d.courier], ["OPERATOR:", d.operator], ["SL", "AWB NUMBER"]];
         d.awbs.forEach((a, i) => wsData.push([i + 1, a]));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
@@ -223,7 +298,7 @@
         const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
         if(!cr || !items.length) return alert("Select Courier & Scan first");
         const fileName = `${getFormattedDate()}_${cr.replace(/\s+/g, '_')}.xlsx`;
-        const wsData = [["COURIER:", cr], ["OPERATOR:", opName], ["DATE:", getFormattedDate()], [], ["SL", "AWB NUMBER"]];
+        const wsData = [["COURIER:", cr], ["SL", "AWB NUMBER"]];
         [...items].reverse().forEach((a, i) => wsData.push([i + 1, a]));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Draft");
@@ -232,7 +307,7 @@
 
     window.triggerPrint = (id) => {
         const d = dataVault[id];
-        const cols = parseInt(prompt("Columns (1-4)?", "2")) || 2;
+        const cols = parseInt(prompt("Columns?", "2")) || 2;
         document.getElementById('p-courier').innerText = d.courier;
         document.getElementById('p-op').innerText = d.operator;
         document.getElementById('p-date').innerText = getFormattedDate();
@@ -250,7 +325,8 @@
         window.print();
     };
 
-    window.delManifest = async (id) => { if(confirm("Delete Manifest?")) await deleteDoc(doc(db, "manifests", id)); };
+    window.delManifest = async (id) => { if(confirm("Delete Entire Lot?")) await deleteDoc(doc(db, "manifests", id)); };
+    window.userPrint = () => { const mockId = 'temp'; dataVault[mockId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length }; window.triggerPrint(mockId); };
 </script>
 </body>
 </html>
