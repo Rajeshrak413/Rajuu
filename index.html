@@ -6,95 +6,86 @@
     <title>Medika Bazaar | AWB Master Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    
-    <script type="text/javascript">
-       (function(){
-          emailjs.init("44Wp4jV5J4gAYwJ4M"); // Your Public Key
-       })();
-    </script>
-
     <style>
         :root { --medika: #004a99; --danger: #dc3545; --locked: #e9ecef; --ready: #fffde7; }
-        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
+        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.3s; }
-        .scan-ready { border-color: var(--medika) !important; background: var(--ready) !important; }
         #scannerView, #adminView, #printView { display: none; }
-        .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
+        .status-badge { cursor: pointer; transition: 0.2s; }
+        .status-badge:hover { opacity: 0.7; transform: scale(1.05); }
+        
+        #loaderOverlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.9); z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--medika); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
-            #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; border: 2px solid black; padding: 10px; }
+            #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; padding: 10px; }
             .print-table { width: 100%; border-collapse: collapse; border: 1px solid black; }
-            .print-table th, .print-table td { border: 1px solid black; padding: 3px; text-align: center; }
+            .print-table th, .print-table td { border: 1px solid black; padding: 4px; text-align: center; font-size: 10pt; }
         }
     </style>
 </head>
 <body onclick="window.autoFocusScanner()">
 
-<div id="printView">
-    <div class="text-center text-decoration-underline h2 fw-bold">MANIFEST LOT</div>
-    <div class="text-center fw-bold">MEDIKA BAZAAR</div>
-    <div class="d-flex justify-content-between align-items-center mt-3">
-        <div class="h1 fw-bold" id="p-courier"></div>
-        <div class="h1 border border-dark rounded-circle px-3 py-2" id="p-count"></div>
-    </div>
-    <div class="d-flex justify-content-between border-top border-bottom border-dark py-1 mt-2">
-        <span>Operator: <b id="p-op"></b></span>
-        <span>Date: <b id="p-date"></b></span>
-    </div>
-    <div class="row mt-3" id="p-grid-container" style="display: grid;"></div>
+<div id="loaderOverlay">
+    <div class="spinner mb-3"></div>
+    <h5 class="fw-bold text-primary">Processing...</h5>
 </div>
 
-<nav class="navbar py-3 no-print shadow">
-    <div class="container d-flex justify-content-between align-items-center">
-        <h3 class="m-0 fw-bold">MEDIKA BAZAAR</h3>
-        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT</button>
+<div id="printView">
+    <div class="text-center h2 fw-bold text-decoration-underline">MANIFEST</div>
+    <div class="d-flex justify-content-between mt-3">
+        <h1 id="p-courier" class="fw-bold"></h1>
+        <h1 id="p-count" class="border border-dark px-3 rounded-circle"></h1>
     </div>
-</nav>
+    <hr>
+    <p>Op: <b id="p-op"></b> | Date: <b id="p-date"></b></p>
+    <div class="print-grid mt-3" id="p-grid-container" style="display: grid; gap: 10px;"></div>
+</div>
+
+<nav class="navbar py-3 no-print shadow"><div class="container d-flex justify-content-between"><b>MEDIKA BAZAAR LOGISTICS</b><button class="btn btn-sm btn-outline-light" onclick="location.reload()">LOGOUT</button></div></nav>
 
 <div class="container mt-4 no-print">
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5 card p-5 text-center shadow">
-            <h2 class="mb-4 text-primary fw-bold">Logistics Portal</h2>
-            <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Name or 0000">
-            <button class="btn btn-primary w-100 btn-lg shadow" onclick="window.handleLogin()">ACCESS PORTAL</button>
+            <h3 class="mb-4 text-primary">Logistics Login</h3>
+            <input type="text" id="loginInput" class="form-control mb-3 text-center fs-4" placeholder="Name or Admin Pass">
+            <button class="btn btn-primary w-100 btn-lg shadow" onclick="window.handleLogin()">ENTER</button>
         </div>
     </div>
 
     <div id="scannerView" class="row g-4">
         <div class="col-lg-5">
-            <div class="card p-4 shadow-sm text-center border-top border-primary border-3">
-                <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <select id="courierSelect" class="form-select form-select-lg mb-2 fw-bold text-center border-primary" onchange="window.handleCourierChange()">
+            <div class="card p-4 shadow-sm border-top border-primary border-3 text-center">
+                <p>Operator: <b id="displayUser"></b></p>
+                <select id="courierSelect" class="form-select form-select-lg mb-3 fw-bold" onchange="window.handleCourierChange()">
                     <option value="">-- SELECT COURIER --</option>
                     <option value="ST COURIER">ST COURIER</option>
                     <option value="BLUEDART">BLUEDART</option>
                     <option value="XPRESS BEES">XPRESS BEES</option>
                     <option value="DTDC">DTDC</option>
                     <option value="DELIVERY">DELIVERY</option>
-                    <option value="B TO B">B TO B</option>
-                    <option value="OTHER">OTHER (MANUAL)</option>
                 </select>
-                <input type="text" id="manualCourier" class="form-control mb-3 fw-bold text-center d-none" placeholder="Enter Courier Name" oninput="window.validateScanner()">
-                <input type="text" id="awbInput" class="form-control scan-input" placeholder="LOCKED" autocomplete="off" disabled>
+                <input type="text" id="awbInput" class="form-control scan-input" placeholder="LOCKED" disabled>
                 <div class="d-grid gap-2 mt-3">
                     <button class="btn btn-success btn-lg fw-bold" onclick="window.showSyncConfirmation()">COMPLETE & SYNC</button>
-                    <div class="row g-2">
-                        <div class="col-6"><button class="btn btn-dark w-100" onclick="window.userPrint()">PRINT</button></div>
-                        <div class="col-6"><button class="btn btn-info text-white w-100" onclick="window.userExcel()">EXCEL</button></div>
-                    </div>
+                    <button class="btn btn-dark" onclick="window.userPrint()">PRINT PREVIEW</button>
                 </div>
             </div>
         </div>
         <div class="col-lg-7 card p-3 shadow-sm border-top border-primary border-3">
             <h5 class="text-primary mb-3">Scanned Parcels: <span id="totalCount" class="badge bg-primary">0</span></h5>
-            <div class="table-responsive" style="max-height: 500px;">
+            <div class="table-responsive" style="max-height: 450px;">
                 <table class="table table-hover text-center">
-                    <thead><tr><th>SL</th><th>AWB Number</th></tr></thead>
+                    <thead><tr><th>SL</th><th>AWB Number</th><th>Action</th></tr></thead>
                     <tbody id="scanBody"></tbody>
                 </table>
             </div>
@@ -102,29 +93,57 @@
     </div>
 
     <div id="adminView">
-        <div class="row mb-3 align-items-center bg-white p-3 rounded shadow-sm mx-0 border-start border-primary border-5">
-            <div class="col-md-2"><h5>Manifest Log</h5></div>
-            <div class="col-md-4"><input type="text" id="searchAWB" class="form-control border-primary" placeholder="🔍 Search AWB..." oninput="window.renderAdminUI()"></div>
-            <div class="col-md-3"><input type="date" id="filterDate" class="form-control border-primary" onchange="window.renderAdminUI()"></div>
-            <div class="col-md-3 text-end">Total Vol: <b id="dayVolume" class="fs-4 text-primary">0</b></div>
+        <div class="card p-3 shadow-sm mb-4 border-start border-primary border-5">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-2"><label class="small fw-bold">From</label><input type="date" id="reportFrom" class="form-control"></div>
+                <div class="col-md-2"><label class="small fw-bold">To</label><input type="date" id="reportTo" class="form-control"></div>
+                <div class="col-md-3">
+                    <select id="reportBucket" class="form-select">
+                        <option value="ALL">ALL BUCKETS</option>
+                        <option value="ST COURIER">ST COURIER</option>
+                        <option value="BLUEDART">BLUEDART</option>
+                        <option value="XPRESS BEES">XPRESS BEES</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="DELIVERY">DELIVERY</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-1">
+                    <button class="btn btn-primary btn-sm flex-fill" onclick="window.exportAdminExcel(false)">Range Excel</button>
+                    <button class="btn btn-danger btn-sm flex-fill" onclick="window.exportAdminExcel(true)">Download All</button>
+                </div>
+                <div class="col-md-2"><input type="text" id="adminSearch" class="form-control" placeholder="🔍 Search..." oninput="window.renderAdminUI()"></div>
+            </div>
         </div>
-        <div id="adminGrid" class="row mt-3"></div>
+
+        <div class="row mb-3 bg-white p-3 rounded shadow-sm mx-0 align-items-center">
+            <div class="col-md-4"><input type="date" id="filterDate" class="form-control" onchange="window.renderAdminUI()"></div>
+            <div class="col-md-4 text-center"><h4>Daily Vol: <span id="dayVolume" class="text-primary fw-bold">0</span></h4></div>
+        </div>
+        <div id="adminGrid" class="row"></div>
     </div>
 </div>
 
-<div class="modal fade" id="syncModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-success border-4"><div class="modal-header bg-success text-white"><h5>Verify Sync</h5></div><div class="modal-body text-center"><h3 id="confCourier" class="fw-bold text-primary"></h3><h1 id="confCount" class="display-4 fw-bold"></h1><p>Sync to Cloud & Send Email notification?</p></div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-success px-5 fw-bold" onclick="window.finalSyncAction()">CONFIRM & SEND</button></div></div></div>
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header bg-dark text-white"><h5>Edit Manifest</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="fw-bold">Courier</label><input type="text" id="editCourierType" class="form-control"></div>
+                <table class="table table-bordered text-center"><tbody id="modalTableBody"></tbody>
+                    <tfoot><tr><td><input type="text" id="newAwbInput" class="form-control" placeholder="Add AWB"></td><td><button class="btn btn-primary" onclick="window.addNewAwb()">+ ADD</button></td></tr></tfoot>
+                </table>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success w-100" onclick="window.saveManifestChanges()">UPDATE CLOUD</button></div>
+    </div></div>
 </div>
 
-<div class="modal fade" id="adminModal" tabindex="-1">
-    <div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header bg-dark text-white"><h5>Edit Manifest Content</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="fw-bold">Courier Name</label><input type="text" id="editCourierType" class="form-control border-primary"></div><table class="table table-bordered text-center"><tbody id="modalTableBody"></tbody><tfoot><tr><td><input type="text" id="newAwbInput" class="form-control text-center" placeholder="Add AWB"></td><td><button class="btn btn-primary" onclick="window.addNewAwb()">+ ADD</button></td></tr></tfoot></table></div><div class="modal-footer"><button class="btn btn-success w-100" onclick="window.saveManifestChanges()">SAVE & UPDATE CLOUD</button></div></div></div>
+<div class="modal fade" id="syncModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-success border-4"><div class="modal-body text-center"><h1 id="confCount" class="display-3 fw-bold"></h1><p>Sync & Email Excel to Rajeshrak413@gmail.com?</p><button class="btn btn-success w-100 btn-lg" onclick="window.finalSyncAction()">CONFIRM</button></div></div></div>
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
 <audio id="sndPolice" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -133,35 +152,31 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}, activeManifestId = null;
-    const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
+    let items = [], opName = "", cloudData = [], dataVault = {}, activeManifestId = null;
     const syncModal = new bootstrap.Modal(document.getElementById('syncModal'));
+    const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    const loader = document.getElementById('loaderOverlay');
 
-    const getISODate = (d = new Date()) => d.toISOString().split('T')[0];
-    document.getElementById('filterDate').value = getISODate();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('filterDate').value = today;
+    document.getElementById('reportFrom').value = today;
+    document.getElementById('reportTo').value = today;
 
-    // LOGIN & NAVIGATION
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
         if(val === "0000") { showState('adminView'); startLiveSync(); }
-        else if(val) { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); scannerActive = true; window.validateScanner(); }
-        else alert("Please enter name");
+        else if(val) { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); }
     };
     function showState(id) { ['loginView', 'scannerView', 'adminView'].forEach(v => document.getElementById(v).style.display = 'none'); document.getElementById(id).style.display = 'block'; }
 
-    // SCANNER LOGIC
+    // SCANNER & SYNC
     window.handleCourierChange = () => {
-        document.getElementById('manualCourier').classList.toggle('d-none', document.getElementById('courierSelect').value !== "OTHER");
-        window.validateScanner();
+        const ready = document.getElementById('courierSelect').value !== "";
+        document.getElementById('awbInput').disabled = !ready;
+        document.getElementById('awbInput').placeholder = ready ? "READY" : "LOCKED";
+        if(ready) document.getElementById('awbInput').focus();
     };
-    window.validateScanner = () => {
-        const s = document.getElementById('courierSelect').value, m = document.getElementById('manualCourier').value.trim(), input = document.getElementById('awbInput');
-        const ready = (s !== "" && s !== "OTHER") || (s === "OTHER" && m !== "");
-        input.disabled = !ready; input.placeholder = ready ? "READY TO SCAN" : "LOCKED";
-        if(ready) input.focus();
-    };
-    window.autoFocusScanner = () => { if(scannerActive && !document.getElementById('awbInput').disabled && !document.querySelector('.modal.show')) document.getElementById('awbInput').focus(); };
-
+    window.autoFocusScanner = () => { if(!document.getElementById('awbInput').disabled && !document.querySelector('.modal.show')) document.getElementById('awbInput').focus(); };
     document.getElementById('awbInput').addEventListener('input', (e) => {
         const val = e.target.value.trim().toUpperCase();
         if(val.length < 4) return;
@@ -172,82 +187,112 @@
         }, 150);
     });
     function renderScanList() { 
-        document.getElementById('scanBody').innerHTML = items.map((a, i) => `<tr><td>${items.length - i}</td><td>${a}</td></tr>`).join(''); 
+        document.getElementById('scanBody').innerHTML = items.map((a, i) => `<tr><td>${items.length - i}</td><td><input type="text" class="form-control form-control-sm text-center" value="${a}" onchange="window.editUserAwb(${i}, this.value)"></td><td><button class="btn btn-sm btn-danger" onclick="window.removeUserAwb(${i})">X</button></td></tr>`).join(''); 
         document.getElementById('totalCount').innerText = items.length; 
     }
+    window.editUserAwb = (index, newVal) => { items[index] = newVal.toUpperCase(); };
+    window.removeUserAwb = (index) => { items.splice(index, 1); renderScanList(); };
 
-    // SYNC & EMAIL
-    window.showSyncConfirmation = () => {
-        const s = document.getElementById('courierSelect').value, cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
-        if (!cr || !items.length) return alert("Select courier and scan some AWBs");
-        document.getElementById('confCourier').innerText = cr; document.getElementById('confCount').innerText = items.length; syncModal.show();
-    };
+    window.showSyncConfirmation = () => { if(!items.length) return alert("Scan items first"); document.getElementById('confCount').innerText = items.length; syncModal.show(); };
     window.finalSyncAction = async () => {
-        const s = document.getElementById('courierSelect').value, cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
+        syncModal.hide(); loader.style.display = 'flex';
+        const manifestData = { operator: opName, courier: document.getElementById('courierSelect').value, awbs: [...items].reverse(), count: items.length };
         try {
-            const manifest = { operator: opName, courier: cr, awbs: [...items].reverse(), count: items.length, time: serverTimestamp(), creationDay: getISODate() };
-            await addDoc(collection(db, "manifests"), manifest);
-            await emailjs.send('service_dcchwpa', 'template_ao4us58', { operator: opName, courier: cr, count: items.length, awb_list: manifest.awbs.join(", "), date: new Date().toLocaleString() });
-            items = []; renderScanList(); syncModal.hide(); alert("Synced and Email Sent!");
-        } catch (e) { alert("Sync Error: " + e.message); }
+            await addDoc(collection(db, "manifests"), { ...manifestData, time: serverTimestamp(), creationDay: today, emailed: true });
+            await fetch('https://medika-backend-fw91.onrender.com/send-manifest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(manifestData) });
+            items = []; renderScanList(); alert("✅ Synced & Emailed!");
+        } catch (e) { alert("Error: " + e.message); } finally { loader.style.display = 'none'; }
     };
 
-    // ADMIN OPERATIONS
-    const startLiveSync = () => {
-        onSnapshot(query(collection(db, "manifests"), orderBy("time", "asc")), (snap) => {
-            cloudData = []; snap.forEach(d => cloudData.push({ id: d.id, ...d.data() })); 
-            window.renderAdminUI();
-        });
-    };
+    // ADMIN RENDER
+    const startLiveSync = () => { onSnapshot(query(collection(db, "manifests"), orderBy("time", "asc")), (snap) => { cloudData = []; snap.forEach(d => cloudData.push({ id: d.id, ...d.data() })); window.renderAdminUI(); }); };
+
     window.renderAdminUI = () => {
-        const grid = document.getElementById('adminGrid'), selDate = document.getElementById('filterDate').value, search = document.getElementById('searchAWB').value.toUpperCase();
+        const grid = document.getElementById('adminGrid'), selDate = document.getElementById('filterDate').value, search = document.getElementById('adminSearch').value.toUpperCase();
         grid.innerHTML = ""; let vol = 0;
         cloudData.forEach(d => {
             if(d.creationDay !== selDate) return;
             if(search && !d.awbs.some(a => a.includes(search))) return;
             vol += d.count; dataVault[d.id] = d;
+            const statusHtml = d.emailed 
+                ? `<span class="status-badge text-success small fw-bold" onclick="window.toggleManualStatus('${d.id}', false)">✅ Emailed</span>` 
+                : `<span class="status-badge text-warning small fw-bold" onclick="window.toggleManualStatus('${d.id}', true)">⌛ Pending</span>`;
             const col = document.createElement('div'); col.className = "col-md-4 mb-3";
-            col.innerHTML = `<div class="card p-3 border-top border-primary border-3 position-relative"><span class="badge bg-danger awb-count-badge">${d.count}</span><h6 class="fw-bold">${d.courier}</h6><p class="small text-muted mb-2">By: ${d.operator}</p><div class="d-grid gap-1"><button class="btn btn-sm btn-dark" onclick="window.triggerPrint('${d.id}')">Print</button><button class="btn btn-sm btn-warning" onclick="window.openEditor('${d.id}')">Edit Items</button><button class="btn btn-sm btn-success" onclick="window.triggerExcel('${d.id}')">Excel</button><button class="btn btn-sm btn-outline-danger" onclick="window.delMan('${d.id}')">Delete</button></div></div>`;
+            col.innerHTML = `
+                <div class="card p-3 border-top border-primary border-3 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <h6 class="fw-bold mb-0">${d.courier} (${d.count})</h6>
+                        ${statusHtml}
+                    </div>
+                    <p class="small text-muted mb-3">Operator: ${d.operator}</p>
+                    <div class="row g-1">
+                        <div class="col-6"><button class="btn btn-sm btn-dark w-100" onclick="window.triggerPrint('${d.id}')">Print</button></div>
+                        <div class="col-6"><button class="btn btn-sm btn-success w-100" onclick="window.downloadSingleExcel('${d.id}')">Excel</button></div>
+                        <div class="col-6"><button class="btn btn-sm btn-warning w-100 text-white" onclick="window.openAdminEdit('${d.id}')">Edit</button></div>
+                        <div class="col-6"><button class="btn btn-sm btn-outline-danger w-100" onclick="window.delMan('${d.id}')">Del</button></div>
+                    </div>
+                </div>`;
             grid.prepend(col);
         });
         document.getElementById('dayVolume').innerText = vol;
     };
 
-    // ADMIN EDITOR FUNCTIONS
-    window.openEditor = (id) => { activeManifestId = id; const d = dataVault[id]; document.getElementById('editCourierType').value = d.courier; renderModalTable(); adminModal.show(); };
-    function renderModalTable() { 
-        const d = dataVault[activeManifestId]; 
-        document.getElementById('modalTableBody').innerHTML = d.awbs.map((a, i) => `<tr><td><input class="form-control text-center" value="${a}" oninput="window.updAwb(${i}, this.value)"></td><td><button class="btn btn-sm btn-danger" onclick="window.remAwb(${i})">X</button></td></tr>`).join(''); 
-    }
-    window.updAwb = (i, v) => dataVault[activeManifestId].awbs[i] = v.toUpperCase();
-    window.remAwb = (i) => { dataVault[activeManifestId].awbs.splice(i, 1); renderModalTable(); };
-    window.addNewAwb = () => { const v = document.getElementById('newAwbInput').value.toUpperCase(); if(!v) return; dataVault[activeManifestId].awbs.push(v); document.getElementById('newAwbInput').value = ""; renderModalTable(); };
-    window.saveManifestChanges = async () => { 
-        const d = dataVault[activeManifestId]; 
-        await updateDoc(doc(db, "manifests", activeManifestId), { courier: document.getElementById('editCourierType').value, awbs: d.awbs, count: d.awbs.length }); 
-        adminModal.hide(); alert("Records Updated!"); 
+    // MANUAL OVERRIDE
+    window.toggleManualStatus = async (id, status) => {
+        const msg = status ? "Mark as Emailed?" : "Mark as Pending?";
+        if(confirm(msg)) {
+            await updateDoc(doc(db, "manifests", id), { emailed: status });
+        }
     };
 
-    // PRINT & EXCEL EXPORTS
-    window.triggerPrint = (id) => {
-        const d = dataVault[id]; 
-        document.getElementById('p-courier').innerText = d.courier; document.getElementById('p-op').innerText = d.operator; document.getElementById('p-date').innerText = d.creationDay; document.getElementById('p-count').innerText = d.count;
-        const cont = document.getElementById('p-grid-container'); cont.style.gridTemplateColumns = "repeat(2, 1fr)"; cont.innerHTML = "";
-        const per = Math.ceil(d.awbs.length/2);
-        for(let i=0; i<2; i++){
-            const chunk = d.awbs.slice(i*per, (i+1)*per); let t = `<table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody>`;
-            t += chunk.map((a, j) => `<tr><td>${(i*per)+j+1}</td><td>${a}</td></tr>`).join(''); cont.innerHTML += t + `</tbody></table>`;
-        } window.print();
-    };
-    window.triggerExcel = (id) => {
-        const d = dataVault[id], wsData = [["COURIER:", d.courier], ["DATE:", d.creationDay], [], ["SL", "AWB NUMBER"]];
-        d.awbs.forEach((a, i) => wsData.push([i+1, a]));
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
+    window.downloadSingleExcel = (id) => {
+        const d = dataVault[id];
+        const rows = [["SL", "AWB NUMBER"]];
+        d.awbs.forEach((a, i) => rows.push([i+1, a]));
+        const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, "Manifest");
         XLSX.writeFile(wb, `${d.courier}_${d.creationDay}.xlsx`);
     };
-    window.delMan = async (id) => { if(prompt("Enter Admin Passcode")==="1234"){ await deleteDoc(doc(db, "manifests", id)); alert("Deleted."); } };
-    window.userExcel = () => { if(!items.length) return alert("Scan items first"); const wsData = [["SL", "AWB"]]; [...items].reverse().forEach((a,i)=>wsData.push([i+1, a])); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Draft"); XLSX.writeFile(wb, "Draft_Manifest.xlsx"); };
-    window.userPrint = () => { const mId = 'temp'; dataVault[mId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length, creationDay: getISODate() }; window.triggerPrint(mId); };
+
+    window.exportAdminExcel = (allTime) => {
+        const from = document.getElementById('reportFrom').value, to = document.getElementById('reportTo').value, bucket = document.getElementById('reportBucket').value;
+        const master = [["Date", "Courier", "AWB Number", "Operator"]];
+        let found = 0;
+        cloudData.forEach(d => {
+            const inRange = allTime || (d.creationDay >= from && d.creationDay <= to);
+            if(inRange && (bucket === "ALL" || d.courier === bucket)) {
+                d.awbs.forEach(awb => master.push([d.creationDay, d.courier, awb, d.operator]));
+                found++;
+            }
+        });
+        if(!found) return alert("No data found.");
+        const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(master);
+        XLSX.utils.book_append_sheet(wb, ws, "Master Report");
+        XLSX.writeFile(wb, allTime ? "Medika_All_Time.xlsx" : `Medika_Report_${from}_to_${to}.xlsx`);
+    };
+
+    window.openAdminEdit = (id) => { activeManifestId = id; const d = dataVault[id]; document.getElementById('editCourierType').value = d.courier; renderModalTable(); editModal.show(); };
+    function renderModalTable() { const d = dataVault[activeManifestId]; document.getElementById('modalTableBody').innerHTML = d.awbs.map((a, i) => `<tr><td><input class="form-control text-center" value="${a}" onchange="window.updateAdminAwb(${i}, this.value)"></td><td><button class="btn btn-sm btn-danger" onclick="window.removeAdminAwb(${i})">X</button></td></tr>`).join(''); }
+    window.updateAdminAwb = (i, v) => { dataVault[activeManifestId].awbs[i] = v.toUpperCase(); };
+    window.removeAdminAwb = (i) => { dataVault[activeManifestId].awbs.splice(i, 1); renderModalTable(); };
+    window.addNewAwb = () => { const v = document.getElementById('newAwbInput').value.toUpperCase(); if(!v) return; dataVault[activeManifestId].awbs.push(v); document.getElementById('newAwbInput').value = ""; renderModalTable(); };
+    window.saveManifestChanges = async () => { const d = dataVault[activeManifestId]; await updateDoc(doc(db, "manifests", activeManifestId), { courier: document.getElementById('editCourierType').value, awbs: d.awbs, count: d.awbs.length }); editModal.hide(); alert("Updated!"); };
+
+    window.triggerPrint = (id) => {
+        const d = dataVault[id], colNum = parseInt(prompt("Columns (1-4)?", "2")) || 2;
+        document.getElementById('p-courier').innerText = d.courier; document.getElementById('p-op').innerText = d.operator; document.getElementById('p-date').innerText = d.creationDay; document.getElementById('p-count').innerText = d.count;
+        const cont = document.getElementById('p-grid-container'); cont.style.gridTemplateColumns = `repeat(${colNum}, 1fr)`; cont.innerHTML = "";
+        const per = Math.ceil(d.awbs.length / colNum);
+        for(let i = 0; i < colNum; i++) {
+            const chunk = d.awbs.slice(i * per, (i + 1) * per); if(!chunk.length) continue;
+            let t = `<table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody>`;
+            t += chunk.map((a, j) => `<tr><td>${(i * per) + j + 1}</td><td>${a}</td></tr>`).join('');
+            cont.innerHTML += t + `</tbody></table>`;
+        }
+        window.print();
+    };
+    window.delMan = async (id) => { if(prompt("Passcode?")==="1234"){ await deleteDoc(doc(db, "manifests", id)); alert("Deleted."); } };
+    window.userPrint = () => { const mId = 'temp'; dataVault[mId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length, creationDay: today }; window.triggerPrint(mId); };
 </script>
 </body>
 </html>
