@@ -7,14 +7,15 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --medika: #004a99; --danger: #dc3545; --locked: #e9ecef; --ready: #fffde7; }
+        :root { --medika: #004a99; --danger: #dc3545; --locked: #e9ecef; --ready: #fffde7; --success-flash: #c8e6c9; }
         body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.3s; }
+        .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.2s; }
         .scan-ready { border-color: var(--medika) !important; background: var(--ready) !important; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
+        
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
@@ -89,7 +90,10 @@
             </div>
         </div>
         <div class="col-lg-7 card p-3 shadow-sm border-top border-primary border-3">
-            <h5 class="text-primary mb-3">Scanned: <span id="totalCount" class="badge bg-primary">0</span></h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0">Scanned: <span id="totalCount" class="badge bg-primary">0</span></h5>
+                <button class="btn btn-sm btn-outline-danger" onclick="window.removeLast()">Remove Last</button>
+            </div>
             <div class="table-responsive" style="max-height: 500px;">
                 <table class="table table-hover text-center">
                     <thead><tr><th>SL</th><th>AWB Number</th></tr></thead>
@@ -148,6 +152,7 @@
     const db = getFirestore(app);
 
     let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}, activeManifestId = null; 
+    let scanTimer; 
     const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
 
     const getISODate = (d = new Date()) => d.toISOString().split('T')[0];
@@ -194,29 +199,54 @@
 
     window.autoFocusScanner = () => { 
         const input = document.getElementById('awbInput');
-        // Auto-focus keeping keyboard hidden via inputmode="none"
         if(scannerActive && !input.disabled && !document.querySelector('.modal.show')) {
             input.focus();
         }
     };
 
-    // Optimized for Hardware Scanners (Detects the 'Enter' key they send)
-    document.getElementById('awbInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const val = e.target.value.trim().toUpperCase();
-            if(val.length < 3) return; 
+    // PROCESS SCAN LOGIC
+    const processScan = () => {
+        const input = document.getElementById('awbInput');
+        const val = input.value.trim().toUpperCase();
+        if(val.length < 3) return; 
 
-            if (items.includes(val)) { 
-                document.getElementById('sndPolice').play(); 
-                alert("DUPLICATE!"); 
-            } else { 
-                document.getElementById('sndScan').play(); 
-                items.unshift(val); 
-                renderScanList(); 
-            }
-            e.target.value = ''; // Reset for next scan
+        if (items.includes(val)) { 
+            document.getElementById('sndPolice').play(); 
+            alert("DUPLICATE: " + val); 
+        } else { 
+            document.getElementById('sndScan').play(); 
+            items.unshift(val); 
+            renderScanList(); 
+            // Visual Flash
+            input.style.backgroundColor = "var(--success-flash)";
+            setTimeout(() => { input.style.backgroundColor = "var(--ready)"; }, 200);
+        }
+        input.value = ''; 
+    };
+
+    // AUTO-ENTER LOGIC
+    const inputEl = document.getElementById('awbInput');
+    
+    // 1. Timer based (for scanners without Enter suffix)
+    inputEl.addEventListener('input', () => {
+        clearTimeout(scanTimer);
+        scanTimer = setTimeout(processScan, 300); // Trigger after 300ms pause
+    });
+
+    // 2. Instant Enter (for high-speed scanners with suffix)
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            clearTimeout(scanTimer);
+            processScan();
         }
     });
+
+    window.removeLast = () => {
+        if(items.length > 0) {
+            items.shift();
+            renderScanList();
+        }
+    };
 
     function renderScanList() {
         document.getElementById('scanBody').innerHTML = items.map((a, i) => `<tr><td>${items.length - i}</td><td>${a}</td></tr>`).join('');
@@ -227,14 +257,16 @@
         const s = document.getElementById('courierSelect').value;
         const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
         if (!cr || !items.length) return alert("Select Courier & Scan AWBs");
-        await addDoc(collection(db, "manifests"), { 
-            operator: opName, courier: cr, awbs: [...items].reverse(), 
-            count: items.length, time: serverTimestamp(), creationDay: getISODate() 
-        });
-        items = []; renderScanList(); 
-        document.getElementById('courierSelect').value = "";
-        window.validateScanner();
-        alert("Synced!");
+        try {
+            await addDoc(collection(db, "manifests"), { 
+                operator: opName, courier: cr, awbs: [...items].reverse(), 
+                count: items.length, time: serverTimestamp(), creationDay: getISODate() 
+            });
+            items = []; renderScanList(); 
+            document.getElementById('courierSelect').value = "";
+            window.validateScanner();
+            alert("Synced successfully!");
+        } catch (e) { alert("Sync Failed: Check Internet"); }
     };
 
     const startLiveSync = () => {
