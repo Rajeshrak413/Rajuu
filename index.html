@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --medika: #004a99; --danger: #dc3545; --locked: #e9ecef; --ready: #fffde7; }
-        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; transition: background-color 0.2s; }
+        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.3s; }
@@ -18,20 +18,21 @@
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
-            #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; border: 1px solid black; padding: 10px; }
-            .p-courier-left { font-size: 32pt !important; font-weight: 900; }
-            .p-count-circle-right { font-size: 35pt !important; border: 4px solid black; border-radius: 50%; width: 90px; height: 90px; display: flex; align-items: center; justify-content: center; }
-            .print-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            .print-table th, .print-table td { border: 1px solid black; padding: 4px; text-align: center; font-size: 12pt; }
+            #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; border: 2px solid black; padding: 10px; }
+            .p-courier-left { font-size: 40pt !important; font-weight: 900; }
+            .p-count-circle-right { font-size: 40pt !important; border: 5px solid black; border-radius: 50%; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; }
+            .print-grid { display: grid; gap: 10px; margin-top: 15px; }
+            .print-table { width: 100%; border-collapse: collapse; border: 1px solid black; }
+            .print-table th, .print-table td { border: 1px solid black; padding: 3px; text-align: center; }
         }
     </style>
 </head>
-<body>
+<body onclick="window.autoFocusScanner()">
 
 <div id="printView">
-    <div class="text-center text-decoration-underline h3 fw-bold">MANIFEST LOT</div>
+    <div class="text-center text-decoration-underline h2 fw-bold">MANIFEST LOT</div>
     <div class="text-center fw-bold">MEDIKA BAZAAR</div>
-    <div class="d-flex justify-content-between align-items-center mt-2">
+    <div class="d-flex justify-content-between align-items-center mt-3">
         <div class="p-courier-left" id="p-courier"></div>
         <div class="p-count-circle-right" id="p-count"></div>
     </div>
@@ -39,7 +40,7 @@
         <span>Op: <b id="p-op"></b></span>
         <span>Date: <b id="p-date"></b></span>
     </div>
-    <div id="p-grid-container" style="display: grid; gap: 10px; margin-top: 10px;"></div>
+    <div class="print-grid" id="p-grid-container"></div>
 </div>
 
 <nav class="navbar py-3 no-print shadow">
@@ -54,7 +55,7 @@
         <div class="col-md-5 card p-5 text-center shadow">
             <h2 class="mb-4 text-primary fw-bold">Logistics Portal</h2>
             <input type="text" id="loginInput" class="form-control mb-3 p-3 text-center fs-4" placeholder="Enter Name">
-            <button class="btn btn-primary w-100 btn-lg shadow" id="loginBtn">ACCESS PORTAL</button>
+            <button class="btn btn-primary w-100 btn-lg shadow" onclick="window.handleLogin()">ACCESS PORTAL</button>
         </div>
     </div>
 
@@ -62,9 +63,9 @@
         <div class="col-lg-5">
             <div class="card p-4 shadow-sm text-center border-top border-primary border-3">
                 <p class="mb-1 text-muted">Operator: <b id="displayUser"></b></p>
-                <label class="fw-bold text-primary mb-1">1. SELECT COURIER</label>
-                <select id="courierSelect" class="form-select form-select-lg mb-2 fw-bold text-center border-primary">
-                    <option value="">-- SELECT --</option>
+                <label class="fw-bold text-primary mb-1">1. SELECT COURIER FIRST</label>
+                <select id="courierSelect" class="form-select form-select-lg mb-2 fw-bold text-center border-primary" onchange="window.handleCourierChange()">
+                    <option value="">-- SELECT COURIER --</option>
                     <option value="ST COURIER">ST COURIER</option>
                     <option value="BLUEDART">BLUEDART</option>
                     <option value="XPRESS BEES">XPRESS BEES</option>
@@ -73,29 +74,25 @@
                     <option value="B TO B">B TO B</option>
                     <option value="OTHER">OTHER (MANUAL)</option>
                 </select>
-                <input type="text" id="manualCourier" class="form-control mb-3 fw-bold text-center d-none" placeholder="Type Courier Name">
+                <input type="text" id="manualCourier" class="form-control mb-3 fw-bold text-center d-none" placeholder="Type Courier Name" oninput="window.validateScanner()">
 
                 <label class="fw-bold text-danger d-block mb-1 mt-2">2. SCAN AWB NUMBER</label>
                 <input type="text" id="awbInput" inputmode="none" class="form-control scan-input" placeholder="LOCKED" autocomplete="off" disabled>
 
                 <div class="d-grid gap-2 mt-3">
-                    <button class="btn btn-success btn-lg fw-bold" id="syncBtn">COMPLETE & SYNC</button>
+                    <button class="btn btn-success btn-lg fw-bold" onclick="window.confirmSync()">COMPLETE & SYNC</button>
                     <div class="row g-2">
-                        <div class="col-6"><button class="btn btn-dark w-100" id="printBtn">PRINT</button></div>
-                        <div class="col-6"><button class="btn btn-info text-white w-100" id="excelBtn">EXCEL</button></div>
+                        <div class="col-6"><button class="btn btn-dark w-100" onclick="window.userPrint()">PRINT</button></div>
+                        <div class="col-6"><button class="btn btn-info text-white w-100" onclick="window.userExcel()">EXCEL</button></div>
                     </div>
                 </div>
             </div>
         </div>
-        
         <div class="col-lg-7 card p-3 shadow-sm border-top border-primary border-3">
-            <div class="d-flex justify-content-between">
-                <h5 class="text-primary mb-3">Total Scanned: <span id="totalCount" class="badge bg-primary">0</span></h5>
-                <button class="btn btn-link btn-sm text-danger" id="clearBtn">Clear List</button>
-            </div>
+            <h5 class="text-primary mb-3">Scanned: <span id="totalCount" class="badge bg-primary">0</span></h5>
             <div class="table-responsive" style="max-height: 500px;">
                 <table class="table table-hover text-center">
-                    <thead><tr><th>SL</th><th>AWB Number</th><th>Action</th></tr></thead>
+                    <thead><tr><th>SL</th><th>AWB Number</th></tr></thead>
                     <tbody id="scanBody"></tbody>
                 </table>
             </div>
@@ -105,217 +102,267 @@
     <div id="adminView">
         <div class="row mb-3 align-items-center bg-white p-3 rounded shadow-sm mx-0 border-start border-primary border-5">
             <div class="col-md-2"><h5>Admin History</h5></div>
-            <div class="col-md-4"><input type="text" id="searchAWB" class="form-control" placeholder="Search AWB..."></div>
-            <div class="col-md-3"><input type="date" id="filterDate" class="form-control"></div>
-            <div class="col-md-3 text-end">Day Vol: <b id="dayVolume" class="fs-4 text-primary">0</b></div>
+            <div class="col-md-4"><input type="text" id="searchAWB" class="form-control border-primary" placeholder="🔍 Search AWB Number..." oninput="window.renderAdminUI()"></div>
+            <div class="col-md-3"><input type="date" id="filterDate" class="form-control border-primary" onchange="window.renderAdminUI()"></div>
+            <div class="col-md-3 text-end">Vol: <b id="dayVolume" class="fs-4 text-primary">0</b></div>
         </div>
         <div id="adminGrid" class="row mt-3"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="adminModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white"><h5>Manage Manifest Content</h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3 p-3 bg-light rounded border">
+                    <label class="fw-bold mb-1">Update Courier Type</label>
+                    <select id="editCourierType" class="form-select fw-bold">
+                        <option value="ST COURIER">ST COURIER</option>
+                        <option value="BLUEDART">BLUEDART</option>
+                        <option value="XPRESS BEES">XPRESS BEES</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="DELIVERY">DELIVERY</option>
+                        <option value="B TO B">B TO B</option>
+                    </select>
+                </div>
+                <div class="table-responsive"><table class="table table-bordered text-center"><tbody id="modalTableBody"></tbody>
+                <tfoot><tr class="table-info"><td><input type="text" id="newAwbInput" class="form-control text-center fw-bold" placeholder="Missing AWB"></td><td><button class="btn btn-primary w-100" onclick="window.addNewAwb()">+ ADD</button></td></tr></tfoot>
+                </table></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success w-100 fw-bold py-2" onclick="window.saveManifestChanges()">SAVE CHANGES</button></div>
+        </div>
     </div>
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
 <audio id="sndPolice" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = { apiKey: "AIzaSyCynM9SUrwBGKjzuXuNjnbQERLjnhM4j2k", authDomain: "awbscan-49c04.firebaseapp.com", projectId: "awbscan-49c04", storageBucket: "awbscan-49c04.firebasestorage.app", messagingSenderId: "269309952447", appId: "1:269309952447:web:7e0e524b157e7a9904610a" };
-    
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    let items = JSON.parse(localStorage.getItem('mb_temp_awbs')) || [];
-    let opName = ""; 
-    let scannerActive = false; 
-    let cloudData = []; 
-    let dataVault = {};
-
-    // UI ELEMENTS
-    const loginInput = document.getElementById('loginInput');
-    const courierSelect = document.getElementById('courierSelect');
-    const manualCourier = document.getElementById('manualCourier');
-    const awbInput = document.getElementById('awbInput');
-    const filterDate = document.getElementById('filterDate');
-    const searchAWB = document.getElementById('searchAWB');
+    let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}, activeManifestId = null; 
+    const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
 
     const getISODate = (d = new Date()) => d.toISOString().split('T')[0];
-    filterDate.value = getISODate();
+    const getFormattedDisplayDate = (d = new Date()) => `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+    document.getElementById('filterDate').value = getISODate();
 
-    // FUNCTION TO SHOW/HIDE VIEWS
-    const showState = (id) => {
-        ['loginView', 'scannerView', 'adminView'].forEach(v => document.getElementById(v).style.display = 'none');
-        document.getElementById(id).style.display = 'block';
-    };
-
-    // HANDLE LOGIN
-    document.getElementById('loginBtn').onclick = () => {
-        const val = loginInput.value.trim();
+    window.handleLogin = () => {
+        const val = document.getElementById('loginInput').value.trim();
         if(val === "0000") { showState('adminView'); startLiveSync(); }
-        else if(val) { 
-            opName = val; 
-            document.getElementById('displayUser').innerText = opName; 
-            showState('scannerView'); 
-            scannerActive = true; 
-            renderScanList();
+        else if(val) { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); scannerActive = true; window.validateScanner(); }
+        else { alert("Enter Name"); }
+    };
+
+    function showState(id) { 
+        ['loginView', 'scannerView', 'adminView'].forEach(v => document.getElementById(v).style.display = 'none'); 
+        document.getElementById(id).style.display = 'block'; 
+    }
+
+    window.handleCourierChange = () => {
+        const s = document.getElementById('courierSelect');
+        const m = document.getElementById('manualCourier');
+        m.classList.toggle('d-none', s.value !== "OTHER");
+        window.validateScanner();
+    };
+
+    window.validateScanner = () => {
+        const s = document.getElementById('courierSelect').value;
+        const m = document.getElementById('manualCourier').value.trim();
+        const input = document.getElementById('awbInput');
+        const isCourierSet = (s !== "" && s !== "OTHER") || (s === "OTHER" && m !== "");
+
+        if(isCourierSet) {
+            input.disabled = false;
+            input.placeholder = "READY TO SCAN";
+            input.classList.add('scan-ready');
+            input.focus();
+        } else {
+            input.disabled = true;
+            input.placeholder = "LOCKED - SELECT COURIER";
+            input.classList.remove('scan-ready');
+            input.value = "";
         }
-        else alert("Enter Name");
     };
 
-    // COURIER LOGIC
-    courierSelect.onchange = () => {
-        manualCourier.classList.toggle('d-none', courierSelect.value !== "OTHER");
-        validateScanner();
+    window.autoFocusScanner = () => { 
+        const input = document.getElementById('awbInput');
+        // Auto-focus keeping keyboard hidden via inputmode="none"
+        if(scannerActive && !input.disabled && !document.querySelector('.modal.show')) {
+            input.focus();
+        }
     };
 
-    const validateScanner = () => {
-        const s = courierSelect.value;
-        const isSet = (s !== "" && s !== "OTHER") || (s === "OTHER" && manualCourier.value.trim() !== "");
-        awbInput.disabled = !isSet;
-        awbInput.placeholder = isSet ? "READY TO SCAN" : "LOCKED - SELECT COURIER";
-        if(isSet) { awbInput.classList.add('scan-ready'); awbInput.focus(); }
-        else { awbInput.classList.remove('scan-ready'); }
-    };
-
-    // AUTO-ENTER SCANNING
-    awbInput.onkeydown = (e) => {
+    // Optimized for Hardware Scanners (Detects the 'Enter' key they send)
+    document.getElementById('awbInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            e.preventDefault();
-            const val = awbInput.value.trim().toUpperCase();
-            if(val.length < 3) { awbInput.value = ''; return; }
+            const val = e.target.value.trim().toUpperCase();
+            if(val.length < 3) return; 
 
-            if (items.includes(val)) {
-                document.getElementById('sndPolice').play();
-                document.body.style.backgroundColor = "#f8d7da";
-                setTimeout(() => document.body.style.backgroundColor = "#f4f7f6", 250);
-                alert("DUPLICATE: " + val);
-            } else {
-                document.getElementById('sndScan').play();
-                document.body.style.backgroundColor = "#d4edda";
-                setTimeout(() => document.body.style.backgroundColor = "#f4f7f6", 250);
-                items.unshift(val);
-                localStorage.setItem('mb_temp_awbs', JSON.stringify(items));
-                renderScanList();
+            if (items.includes(val)) { 
+                document.getElementById('sndPolice').play(); 
+                alert("DUPLICATE!"); 
+            } else { 
+                document.getElementById('sndScan').play(); 
+                items.unshift(val); 
+                renderScanList(); 
             }
-            awbInput.value = '';
+            e.target.value = ''; // Reset for next scan
         }
-    };
+    });
 
-    // KEEP FOCUS
-    setInterval(() => {
-        if(scannerActive && !awbInput.disabled) {
-            if(document.activeElement !== awbInput) awbInput.focus();
-        }
-    }, 1000);
-
-    const renderScanList = () => {
-        document.getElementById('scanBody').innerHTML = items.map((a, i) => `
-            <tr>
-                <td>${items.length - i}</td>
-                <td class="fw-bold">${a}</td>
-                <td><button class="btn btn-sm btn-outline-danger btn-remove" data-idx="${i}">×</button></td>
-            </tr>`).join('');
+    function renderScanList() {
+        document.getElementById('scanBody').innerHTML = items.map((a, i) => `<tr><td>${items.length - i}</td><td>${a}</td></tr>`).join('');
         document.getElementById('totalCount').innerText = items.length;
+    }
 
-        document.querySelectorAll('.btn-remove').forEach(btn => {
-            btn.onclick = () => {
-                items.splice(btn.dataset.idx, 1);
-                localStorage.setItem('mb_temp_awbs', JSON.stringify(items));
-                renderScanList();
-            };
-        });
-    };
-
-    document.getElementById('clearBtn').onclick = () => {
-        if(confirm("Clear current list?")) { items=[]; localStorage.removeItem('mb_temp_awbs'); renderScanList(); }
-    };
-
-    // FIREBASE SYNC
-    document.getElementById('syncBtn').onclick = async () => {
-        const s = courierSelect.value;
-        const cr = s === "OTHER" ? manualCourier.value : s;
-        if (!cr || !items.length) return alert("Select Courier & Scan items first");
-        
+    window.confirmSync = async () => {
+        const s = document.getElementById('courierSelect').value;
+        const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
+        if (!cr || !items.length) return alert("Select Courier & Scan AWBs");
         await addDoc(collection(db, "manifests"), { 
             operator: opName, courier: cr, awbs: [...items].reverse(), 
             count: items.length, time: serverTimestamp(), creationDay: getISODate() 
         });
-        items = []; localStorage.removeItem('mb_temp_awbs');
-        renderScanList(); alert("Synced!");
+        items = []; renderScanList(); 
+        document.getElementById('courierSelect').value = "";
+        window.validateScanner();
+        alert("Synced!");
     };
 
-    // ADMIN & PRINT
     const startLiveSync = () => {
         onSnapshot(query(collection(db, "manifests"), orderBy("time", "asc")), (snap) => {
             cloudData = []; snap.forEach(d => cloudData.push({ id: d.id, ...d.data() }));
-            renderAdminUI();
+            window.renderAdminUI();
         });
     };
 
-    const renderAdminUI = () => {
+    window.renderAdminUI = () => {
         const grid = document.getElementById('adminGrid');
-        const day = filterDate.value;
-        const search = searchAWB.value.toUpperCase();
-        grid.innerHTML = ""; let vol = 0;
-        
-        cloudData.filter(d => (d.creationDay || "") === day).forEach((d, i) => {
-            if(search && !d.awbs.some(a => a.includes(search))) return;
-            vol += d.count; dataVault[d.id] = d;
-            grid.innerHTML += `<div class="col-md-4 mb-3">
-                <div class="card p-3 border-top border-primary border-3">
-                    <span class="badge bg-danger awb-count-badge">${d.count}</span>
-                    <h6 class="text-center fw-bold">LOT ${i+1} - ${d.courier}</h6>
-                    <div class="d-grid gap-1">
-                        <button class="btn btn-sm btn-dark btn-print" data-id="${d.id}">Print</button>
-                        <button class="btn btn-sm btn-danger btn-del" data-id="${d.id}">Delete</button>
-                    </div>
+        const selectedDate = document.getElementById('filterDate').value;
+        const searchTerm = document.getElementById('searchAWB').value.trim().toUpperCase();
+        grid.innerHTML = ""; let total = 0;
+
+        cloudData.forEach((d, idx) => {
+            const manifestDate = d.creationDay || (d.time ? getISODate(d.time.toDate()) : "");
+            if(manifestDate !== selectedDate) return;
+            const hasMatch = searchTerm === "" || d.awbs.some(awb => awb.includes(searchTerm));
+            if (!hasMatch) return;
+
+            total += d.count; dataVault[d.id] = JSON.parse(JSON.stringify(d)); 
+            const col = document.createElement('div'); col.className = "col-md-4 mb-3";
+            col.innerHTML = `<div class="card p-3 border-top border-primary border-3">
+                <span class="badge bg-danger awb-count-badge">${d.count}</span>
+                <h6 class="text-center fw-bold">LOT ${idx+1} - ${d.courier}</h6>
+                <div class="d-grid gap-1">
+                    <button class="btn btn-sm btn-dark" onclick="window.triggerPrint('${d.id}')">Print</button>
+                    <button class="btn btn-sm btn-outline-dark" onclick="window.openAdminEditor('${d.id}')">Edit Items</button>
+                    <button class="btn btn-sm btn-success" onclick="window.triggerExcel('${d.id}')">Excel</button>
+                    <button class="btn btn-sm btn-danger mt-1" onclick="window.delManifest('${d.id}')">Delete Lot</button>
                 </div>
             </div>`;
+            grid.prepend(col);
         });
-        document.getElementById('dayVolume').innerText = vol;
-
-        document.querySelectorAll('.btn-print').forEach(b => b.onclick = () => triggerPrint(b.dataset.id));
-        document.querySelectorAll('.btn-del').forEach(b => b.onclick = () => delManifest(b.dataset.id));
+        document.getElementById('dayVolume').innerText = total;
     };
 
-    const triggerPrint = (id) => {
-        const d = (typeof id === 'string') ? dataVault[id] : id;
+    window.openAdminEditor = (id) => {
+        activeManifestId = id;
+        const d = dataVault[id];
+        document.getElementById('editCourierType').value = d.courier;
+        renderModalTable();
+        adminModal.show();
+    };
+
+    function renderModalTable() {
+        const d = dataVault[activeManifestId];
+        document.getElementById('modalTableBody').innerHTML = d.awbs.map((a, i) => `
+            <tr>
+                <td><input type="text" class="form-control text-center fw-bold" value="${a}" oninput="window.updateAwbValue(${i}, this.value)"></td>
+                <td><button class="btn btn-sm btn-danger" onclick="window.removeAwbFromManifest(${i})">Remove</button></td>
+            </tr>`).join('');
+    }
+
+    window.updateAwbValue = (idx, val) => { dataVault[activeManifestId].awbs[idx] = val.trim().toUpperCase(); };
+    window.removeAwbFromManifest = (idx) => { dataVault[activeManifestId].awbs.splice(idx, 1); renderModalTable(); };
+    window.addNewAwb = () => {
+        const val = document.getElementById('newAwbInput').value.trim().toUpperCase();
+        if(!val) return;
+        dataVault[activeManifestId].awbs.push(val);
+        document.getElementById('newAwbInput').value = "";
+        renderModalTable();
+    };
+
+    window.saveManifestChanges = async () => {
+        const d = dataVault[activeManifestId];
+        await updateDoc(doc(db, "manifests", activeManifestId), {
+            courier: document.getElementById('editCourierType').value,
+            awbs: d.awbs,
+            count: d.awbs.length
+        });
+        adminModal.hide(); alert("Updated!");
+    };
+
+    window.triggerExcel = (id) => {
+        const d = dataVault[id];
+        const fileName = `${getFormattedDisplayDate()}_${d.courier.replace(/\s+/g, '_')}.xlsx`;
+        const wsData = [["COURIER:", d.courier], ["OPERATOR:", d.operator], ["DATE:", getFormattedDisplayDate()], [], ["SL", "AWB NUMBER"]];
+        d.awbs.forEach((a, i) => wsData.push([i + 1, a]));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
+        XLSX.writeFile(wb, fileName);
+    };
+
+    window.userExcel = () => {
+        const s = document.getElementById('courierSelect').value;
+        const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
+        if(!cr || !items.length) return alert("Incomplete Data");
+        const fileName = `${getFormattedDisplayDate()}_${cr.replace(/\s+/g, '_')}.xlsx`;
+        const wsData = [["COURIER:", cr], ["SL", "AWB NUMBER"]];
+        [...items].reverse().forEach((a, i) => wsData.push([i + 1, a]));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Draft");
+        XLSX.writeFile(wb, fileName);
+    };
+
+    window.triggerPrint = (id) => {
+        const d = dataVault[id];
+        const cols = parseInt(prompt("Columns (1-4)?", "2")) || 2;
         document.getElementById('p-courier').innerText = d.courier;
         document.getElementById('p-op').innerText = d.operator;
-        document.getElementById('p-date').innerText = getISODate();
+        document.getElementById('p-date').innerText = getFormattedDisplayDate();
         document.getElementById('p-count').innerText = d.count;
-        
         const cont = document.getElementById('p-grid-container');
-        cont.style.gridTemplateColumns = "repeat(2, 1fr)";
+        cont.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
         cont.innerHTML = "";
-        const mid = Math.ceil(d.awbs.length / 2);
-        [d.awbs.slice(0, mid), d.awbs.slice(mid)].forEach(chunk => {
-            let t = `<table class="print-table"><tr><th>SL</th><th>AWB</th></tr>`;
-            chunk.forEach((a, i) => t += `<tr><td>${d.awbs.indexOf(a)+1}</td><td>${a}</td></tr>`);
-            cont.innerHTML += t + `</table>`;
-        });
+        const perCol = Math.ceil(d.awbs.length / cols);
+        for(let i=0; i<cols; i++) {
+            const chunk = d.awbs.slice(i*perCol, (i+1)*perCol);
+            let t = `<table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody>`;
+            t += chunk.map((a, j) => `<tr><td>${(i*perCol)+j+1}</td><td>${a}</td></tr>`).join('');
+            cont.innerHTML += t + `</tbody></table>`;
+        }
         window.print();
     };
 
-    document.getElementById('printBtn').onclick = () => {
-        const s = courierSelect.value;
-        const cr = s === "OTHER" ? manualCourier.value : s;
-        if(!items.length) return alert("List empty");
-        triggerPrint({ courier: cr, operator: opName, awbs: [...items].reverse(), count: items.length });
+    window.delManifest = async (id) => {
+        const code = prompt("Enter ADMIN PASSCODE to delete:");
+        if (code === "1234") {
+            if(confirm("Confirm Delete?")) {
+                await deleteDoc(doc(db, "manifests", id));
+                alert("Deleted.");
+            }
+        } else { alert("Access Denied."); }
     };
 
-    document.getElementById('excelBtn').onclick = () => {
-        const s = courierSelect.value;
-        const cr = s === "OTHER" ? manualCourier.value : s;
-        const ws = XLSX.utils.aoa_to_sheet([["Courier", cr], ["Operator", opName], ["AWB Number"], ...items.map(a => [a])]);
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Manifest");
-        XLSX.writeFile(wb, `Manifest_${cr}.xlsx`);
-    };
-
-    const delManifest = async (id) => { if(confirm("Delete this Lot?")) await deleteDoc(doc(db, "manifests", id)); };
-
-    searchAWB.oninput = renderAdminUI;
-    filterDate.onchange = renderAdminUI;
+    window.userPrint = () => { const mockId = 'temp'; dataVault[mockId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length }; window.triggerPrint(mockId); };
 </script>
 </body>
 </html>
