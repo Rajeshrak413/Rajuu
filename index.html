@@ -8,13 +8,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --medika: #004a99; --danger: #dc3545; --locked: #e9ecef; --ready: #fffde7; }
-        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
+        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; transition: background-color 0.2s ease; }
         .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.3s; }
         .scan-ready { border-color: var(--medika) !important; background: var(--ready) !important; }
         #scannerView, #adminView, #printView { display: none; }
         .awb-count-badge { position: absolute; top: 12px; right: 12px; font-size: 1.2rem; padding: 6px 14px; border-radius: 8px; font-weight: 800; background: var(--danger); color: white; }
+        
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
@@ -27,7 +28,7 @@
         }
     </style>
 </head>
-<body onclick="window.autoFocusScanner()">
+<body>
 
 <div id="printView">
     <div class="text-center text-decoration-underline h2 fw-bold">MANIFEST LOT</div>
@@ -89,7 +90,10 @@
             </div>
         </div>
         <div class="col-lg-7 card p-3 shadow-sm border-top border-primary border-3">
-            <h5 class="text-primary mb-3">Scanned: <span id="totalCount" class="badge bg-primary">0</span></h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0">Scanned: <span id="totalCount" class="badge bg-primary">0</span></h5>
+                <button class="btn btn-sm btn-outline-danger" onclick="window.clearCurrentList()">Clear All</button>
+            </div>
             <div class="table-responsive" style="max-height: 500px;">
                 <table class="table table-hover text-center">
                     <thead><tr><th>SL</th><th>AWB Number</th></tr></thead>
@@ -147,17 +151,31 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    let items = [], opName = "", scannerActive = false, cloudData = [], dataVault = {}, activeManifestId = null; 
+    // Initial State
+    let items = JSON.parse(localStorage.getItem('temp_items')) || []; 
+    let opName = ""; 
+    let scannerActive = false; 
+    let cloudData = []; 
+    let dataVault = {}; 
+    let activeManifestId = null; 
     const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
 
     const getISODate = (d = new Date()) => d.toISOString().split('T')[0];
     const getFormattedDisplayDate = (d = new Date()) => `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
     document.getElementById('filterDate').value = getISODate();
 
+    // ---------------- Scanner & Login ----------------
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
         if(val === "0000") { showState('adminView'); startLiveSync(); }
-        else if(val) { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); scannerActive = true; window.validateScanner(); }
+        else if(val) { 
+            opName = val; 
+            document.getElementById('displayUser').innerText = opName; 
+            showState('scannerView'); 
+            scannerActive = true; 
+            window.validateScanner();
+            renderScanList();
+        }
         else { alert("Enter Name"); }
     };
 
@@ -166,12 +184,41 @@
         document.getElementById(id).style.display = 'block'; 
     }
 
-    window.handleCourierChange = () => {
-        const s = document.getElementById('courierSelect');
-        const m = document.getElementById('manualCourier');
-        m.classList.toggle('d-none', s.value !== "OTHER");
-        window.validateScanner();
-    };
+    // ---------------- Hardware Scanner Logic (Auto-Enter) ----------------
+    function flashScreen(color) {
+        const original = document.body.style.backgroundColor;
+        document.body.style.backgroundColor = color;
+        setTimeout(() => document.body.style.backgroundColor = original, 200);
+    }
+
+    // Persistent Focus: Forces the cursor into the scan box every 1 sec
+    setInterval(() => {
+        const input = document.getElementById('awbInput');
+        if(scannerActive && !input.disabled && !document.querySelector('.modal.show')) {
+            if(document.activeElement !== input) input.focus();
+        }
+    }, 1000);
+
+    document.getElementById('awbInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = e.target.value.trim().toUpperCase();
+            if(val.length < 3) { e.target.value = ''; return; }
+
+            if (items.includes(val)) { 
+                document.getElementById('sndPolice').play(); 
+                flashScreen('#f8d7da'); // Red Flash
+                alert("DUPLICATE!"); 
+            } else { 
+                document.getElementById('sndScan').play(); 
+                flashScreen('#d4edda'); // Green Flash
+                items.unshift(val); 
+                localStorage.setItem('temp_items', JSON.stringify(items));
+                renderScanList(); 
+            }
+            e.target.value = ''; 
+        }
+    });
 
     window.validateScanner = () => {
         const s = document.getElementById('courierSelect').value;
@@ -192,51 +239,48 @@
         }
     };
 
-    window.autoFocusScanner = () => { 
-        const input = document.getElementById('awbInput');
-        // Auto-focus keeping keyboard hidden via inputmode="none"
-        if(scannerActive && !input.disabled && !document.querySelector('.modal.show')) {
-            input.focus();
-        }
+    window.handleCourierChange = () => {
+        const s = document.getElementById('courierSelect');
+        const m = document.getElementById('manualCourier');
+        m.classList.toggle('d-none', s.value !== "OTHER");
+        window.validateScanner();
     };
-
-    // Optimized for Hardware Scanners (Detects the 'Enter' key they send)
-    document.getElementById('awbInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const val = e.target.value.trim().toUpperCase();
-            if(val.length < 3) return; 
-
-            if (items.includes(val)) { 
-                document.getElementById('sndPolice').play(); 
-                alert("DUPLICATE!"); 
-            } else { 
-                document.getElementById('sndScan').play(); 
-                items.unshift(val); 
-                renderScanList(); 
-            }
-            e.target.value = ''; // Reset for next scan
-        }
-    });
 
     function renderScanList() {
         document.getElementById('scanBody').innerHTML = items.map((a, i) => `<tr><td>${items.length - i}</td><td>${a}</td></tr>`).join('');
         document.getElementById('totalCount').innerText = items.length;
     }
 
+    window.clearCurrentList = () => {
+        if(confirm("Discard all scanned items?")) {
+            items = [];
+            localStorage.removeItem('temp_items');
+            renderScanList();
+        }
+    };
+
     window.confirmSync = async () => {
         const s = document.getElementById('courierSelect').value;
         const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
         if (!cr || !items.length) return alert("Select Courier & Scan AWBs");
-        await addDoc(collection(db, "manifests"), { 
-            operator: opName, courier: cr, awbs: [...items].reverse(), 
-            count: items.length, time: serverTimestamp(), creationDay: getISODate() 
-        });
-        items = []; renderScanList(); 
-        document.getElementById('courierSelect').value = "";
-        window.validateScanner();
-        alert("Synced!");
+        
+        try {
+            await addDoc(collection(db, "manifests"), { 
+                operator: opName, courier: cr, awbs: [...items].reverse(), 
+                count: items.length, time: serverTimestamp(), creationDay: getISODate() 
+            });
+            items = []; 
+            localStorage.removeItem('temp_items');
+            renderScanList(); 
+            document.getElementById('courierSelect').value = "";
+            window.validateScanner();
+            alert("Successfully Synced to Database!");
+        } catch (e) {
+            alert("Sync Failed: " + e.message);
+        }
     };
 
+    // ---------------- Admin Logic ----------------
     const startLiveSync = () => {
         onSnapshot(query(collection(db, "manifests"), orderBy("time", "asc")), (snap) => {
             cloudData = []; snap.forEach(d => cloudData.push({ id: d.id, ...d.data() }));
@@ -310,33 +354,12 @@
         adminModal.hide(); alert("Updated!");
     };
 
-    window.triggerExcel = (id) => {
-        const d = dataVault[id];
-        const fileName = `${getFormattedDisplayDate()}_${d.courier.replace(/\s+/g, '_')}.xlsx`;
-        const wsData = [["COURIER:", d.courier], ["OPERATOR:", d.operator], ["DATE:", getFormattedDisplayDate()], [], ["SL", "AWB NUMBER"]];
-        d.awbs.forEach((a, i) => wsData.push([i + 1, a]));
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Manifest");
-        XLSX.writeFile(wb, fileName);
-    };
-
-    window.userExcel = () => {
-        const s = document.getElementById('courierSelect').value;
-        const cr = s === "OTHER" ? document.getElementById('manualCourier').value : s;
-        if(!cr || !items.length) return alert("Incomplete Data");
-        const fileName = `${getFormattedDisplayDate()}_${cr.replace(/\s+/g, '_')}.xlsx`;
-        const wsData = [["COURIER:", cr], ["SL", "AWB NUMBER"]];
-        [...items].reverse().forEach((a, i) => wsData.push([i + 1, a]));
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Draft");
-        XLSX.writeFile(wb, fileName);
-    };
-
+    // ---------------- Reporting (Print/Excel) ----------------
     window.triggerPrint = (id) => {
         const d = dataVault[id];
-        const cols = parseInt(prompt("Columns (1-4)?", "2")) || 2;
+        const cols = parseInt(prompt("How many columns for the printout? (1-4)", "2")) || 2;
         document.getElementById('p-courier').innerText = d.courier;
-        document.getElementById('p-op').innerText = d.operator;
+        document.getElementById('p-op').innerText = d.operator || "Admin";
         document.getElementById('p-date').innerText = getFormattedDisplayDate();
         document.getElementById('p-count').innerText = d.count;
         const cont = document.getElementById('p-grid-container');
@@ -352,17 +375,24 @@
         window.print();
     };
 
+    window.triggerExcel = (id) => {
+        const d = dataVault[id];
+        const fileName = `${getFormattedDisplayDate()}_${d.courier.replace(/\s+/g, '_')}.xlsx`;
+        const wsData = [["COURIER:", d.courier], ["OPERATOR:", d.operator], ["DATE:", getFormattedDisplayDate()], [], ["SL", "AWB NUMBER"]];
+[...items].reverse().forEach((a, i) => wsData.push([i + 1, a]));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), "Draft");
+        XLSX.writeFile(wb, fileName);
+    };
+
     window.delManifest = async (id) => {
-        const code = prompt("Enter ADMIN PASSCODE to delete:");
-        if (code === "1234") {
+        if (prompt("Enter ADMIN PASSCODE to delete:") === "1234") {
             if(confirm("Confirm Delete?")) {
                 await deleteDoc(doc(db, "manifests", id));
                 alert("Deleted.");
             }
         } else { alert("Access Denied."); }
     };
-
-    window.userPrint = () => { const mockId = 'temp'; dataVault[mockId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length }; window.triggerPrint(mockId); };
 </script>
 </body>
 </html>
