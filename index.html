@@ -15,7 +15,7 @@
         #scannerView, #adminView, #printView { display: none; }
         .status-badge { cursor: pointer; transition: 0.2s; }
         .status-badge:hover { opacity: 0.7; transform: scale(1.05); }
-        
+
         #loaderOverlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255, 255, 255, 0.9); z-index: 9999;
@@ -24,12 +24,152 @@
         .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--medika); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* Keyboard Toggle Button */
+        .keyboard-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--medika);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        .keyboard-toggle:hover {
+            transform: scale(1.1);
+            background: #003377;
+        }
+        .keyboard-toggle.disabled {
+            background: #6c757d;
+        }
+
+        /* Voice Control Badge */
+        .voice-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .voice-badge:hover {
+            transform: scale(1.1);
+        }
+
+        /* Visual Counter Display */
+        .counter-display {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            overflow: hidden;
+        }
+        .counter-display::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        .counter-number {
+            font-size: 5rem;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+            line-height: 1;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        .counter-number.pulse-animation {
+            animation: countPulse 0.6s ease-out;
+        }
+        @keyframes countPulse {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.3); color: #ffd700; }
+            100% { transform: scale(1); }
+        }
+        .counter-label {
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.9);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+            margin-top: 10px;
+        }
+        .counter-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        .stat-item {
+            text-align: center;
+            color: white;
+        }
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            text-transform: uppercase;
+        }
+        .progress-ring {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            width: 80px;
+            height: 80px;
+        }
+        .progress-ring circle {
+            fill: none;
+            stroke: rgba(255,255,255,0.3);
+            stroke-width: 8;
+        }
+        .progress-ring .progress {
+            stroke: #ffd700;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        /* Scan Flash Effect */
+        @keyframes scanFlash {
+            0% { background-color: inherit; }
+            50% { background-color: rgba(40, 167, 69, 0.3); }
+            100% { background-color: inherit; }
+        }
+        .flash-success {
+            animation: scanFlash 0.5s ease-out;
+        }
+
         @media print {
             body * { visibility: hidden; }
             #printView, #printView * { visibility: visible; }
             #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; padding: 10px; }
             .print-table { width: 100%; border-collapse: collapse; border: 1px solid black; }
             .print-table th, .print-table td { border: 1px solid black; padding: 4px; text-align: center; font-size: 10pt; }
+            .keyboard-toggle { display: none !important; }
         }
     </style>
 </head>
@@ -53,6 +193,11 @@
 
 <nav class="navbar py-3 no-print shadow"><div class="container d-flex justify-content-between"><b>MEDIKA BAZAAR LOGISTICS</b><button class="btn btn-sm btn-outline-light" onclick="location.reload()">LOGOUT</button></div></nav>
 
+<!-- Keyboard Toggle Button -->
+<button id="keyboardToggle" class="keyboard-toggle no-print" onclick="window.toggleKeyboard()" title="Toggle On-Screen Keyboard">
+    ⌨️
+</button>
+
 <div class="container mt-4 no-print">
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5 card p-5 text-center shadow">
@@ -64,7 +209,38 @@
 
     <div id="scannerView" class="row g-4">
         <div class="col-lg-5">
-            <div class="card p-4 shadow-sm border-top border-primary border-3 text-center">
+            <!-- Visual Counter Display -->
+            <div class="counter-display text-center">
+                <div class="counter-number" id="visualCounter">0</div>
+                <div class="counter-label">Parcels Scanned</div>
+                <div class="counter-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="scanRate">0</span>
+                        <span class="stat-label">Per Min</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="sessionTime">0:00</span>
+                        <span class="stat-label">Session</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="lastScan">--</span>
+                        <span class="stat-label">Last Scan</span>
+                    </div>
+                </div>
+                <!-- Progress Ring -->
+                <svg class="progress-ring" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40"></circle>
+                    <circle cx="50" cy="50" r="40" class="progress" id="progressCircle" 
+                            stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+                </svg>
+            </div>
+            
+            <div class="card p-4 shadow-sm border-top border-primary border-3 text-center position-relative">
+                <!-- Voice Toggle Badge -->
+                <span class="voice-badge badge bg-success" onclick="window.toggleVoice()" id="voiceBadge" title="Toggle Voice Announcements">
+                    🔊 Voice ON
+                </span>
+                
                 <p>Operator: <b id="displayUser"></b></p>
                 <select id="courierSelect" class="form-select form-select-lg mb-3 fw-bold" onchange="window.handleCourierChange()">
                     <option value="">-- SELECT COURIER --</option>
@@ -137,13 +313,13 @@
 </div>
 
 <div class="modal fade" id="syncModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-success border-4"><div class="modal-body text-center"><h1 id="confCount" class="display-3 fw-bold"></h1><p>Sync & Email Excel to Rajeshrak413@gmail.com?</p><button class="btn btn-success w-100 btn-lg" onclick="window.finalSyncAction()">CONFIRM</button></div></div></div>
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-success border-4"><div class="modal-body text-center"><h1 id="confCount" class="display-3 fw-bold"></h1><p>Sync & Email Excel to <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="9fcdfef5faecf7edfef4abaeacdff8f2fef6f3b1fcf0f2">[email&#160;protected]</a>?</p><button class="btn btn-success w-100 btn-lg" onclick="window.finalSyncAction()">CONFIRM</button></div></div></div>
 </div>
 
 <audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
 <audio id="sndPolice" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -153,6 +329,12 @@
     const db = getFirestore(app);
 
     let items = [], opName = "", cloudData = [], dataVault = {}, activeManifestId = null;
+    let voiceEnabled = true; // Voice announcement toggle
+    let keyboardEnabled = true; // Keyboard input toggle
+    let sessionStartTime = null; // Track session start
+    let scanTimestamps = []; // Track scan times for rate calculation
+    let sessionTimer = null; // Session time interval
+    
     const syncModal = new bootstrap.Modal(document.getElementById('syncModal'));
     const editModal = new bootstrap.Modal(document.getElementById('editModal'));
     const loader = document.getElementById('loaderOverlay');
@@ -162,45 +344,217 @@
     document.getElementById('reportFrom').value = today;
     document.getElementById('reportTo').value = today;
 
+    // ========== VOICE ANNOUNCEMENT FUNCTION ==========
+    window.speakCount = (count) => {
+        if (!voiceEnabled) return;
+        
+        if ('speechSynthesis' in window) {
+            // Cancel any ongoing speech
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(`${count}`);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            utterance.lang = 'en-US';
+            
+            window.speechSynthesis.speak(utterance);
+        }
+    };
+
+    // ========== VOICE TOGGLE ==========
+    window.toggleVoice = () => {
+        voiceEnabled = !voiceEnabled;
+        const badge = document.getElementById('voiceBadge');
+        if (voiceEnabled) {
+            badge.className = 'voice-badge badge bg-success';
+            badge.innerHTML = '🔊 Voice ON';
+            window.speakCount('Voice enabled');
+        } else {
+            badge.className = 'voice-badge badge bg-secondary';
+            badge.innerHTML = '🔇 Voice OFF';
+        }
+    };
+
+    // ========== KEYBOARD TOGGLE ==========
+    window.toggleKeyboard = () => {
+        const input = document.getElementById('awbInput');
+        const toggleBtn = document.getElementById('keyboardToggle');
+        
+        keyboardEnabled = !keyboardEnabled;
+        
+        if (keyboardEnabled) {
+            input.removeAttribute('readonly');
+            toggleBtn.classList.remove('disabled');
+            toggleBtn.title = 'Disable Keyboard Input';
+            alert('✅ Keyboard Input ENABLED');
+        } else {
+            input.setAttribute('readonly', 'readonly');
+            toggleBtn.classList.add('disabled');
+            toggleBtn.title = 'Enable Keyboard Input';
+            alert('🔒 Keyboard Input DISABLED (Scanner Only Mode)');
+        }
+    };
+
     window.handleLogin = () => {
         const val = document.getElementById('loginInput').value.trim();
         if(val === "0000") { showState('adminView'); startLiveSync(); }
-        else if(val) { opName = val; document.getElementById('displayUser').innerText = opName; showState('scannerView'); }
+        else if(val) { 
+            opName = val; 
+            document.getElementById('displayUser').innerText = opName; 
+            showState('scannerView');
+            startSessionTracking();
+        }
     };
-    function showState(id) { ['loginView', 'scannerView', 'adminView'].forEach(v => document.getElementById(v).style.display = 'none'); document.getElementById(id).style.display = 'block'; }
+    
+    // Start session tracking
+    function startSessionTracking() {
+        sessionStartTime = Date.now();
+        scanTimestamps = [];
+        updateSessionTimer();
+        sessionTimer = setInterval(updateSessionTimer, 1000);
+    }
+    
+    // Update session time display
+    function updateSessionTimer() {
+        if (!sessionStartTime) return;
+        const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('sessionTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Calculate scan rate (scans per minute)
+    function updateScanRate() {
+        const now = Date.now();
+        // Keep only scans from last minute
+        scanTimestamps = scanTimestamps.filter(time => now - time < 60000);
+        const rate = scanTimestamps.length;
+        document.getElementById('scanRate').textContent = rate;
+    }
+    
+       // Update visual counter with animation
+    function updateVisualCounter(count) {
+        const counterEl = document.getElementById('visualCounter');
+        counterEl.textContent = count;
+        
+        // Add pulse animation
+        counterEl.classList.remove('pulse-animation');
+        void counterEl.offsetWidth; // Trigger reflow
+        counterEl.classList.add('pulse-animation');
+        
+        // Update progress ring (example: max 100 parcels for full circle)
+        const maxParcels = 100;
+        const percentage = Math.min(count / maxParcels, 1);
+        const circumference = 251.2;
+        const offset = circumference * (1 - percentage);
+        document.getElementById('progressCircle').style.strokeDashoffset = offset;
+        
+        // Update last scan time
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('lastScan').textContent = timeStr.split(' ')[0];
+    }
+    function showState(id) { 
+        ['loginView', 'scannerView', 'adminView'].forEach(v => document.getElementById(v).style.display = 'none'); 
+        document.getElementById(id).style.display = 'block'; 
+        
+        // Show/hide keyboard toggle button
+        const toggleBtn = document.getElementById('keyboardToggle');
+        if (id === 'scannerView') {
+            toggleBtn.style.display = 'block';
+        } else {
+            toggleBtn.style.display = 'none';
+        }
+    }
 
     // SCANNER & SYNC
     window.handleCourierChange = () => {
         const ready = document.getElementById('courierSelect').value !== "";
         document.getElementById('awbInput').disabled = !ready;
         document.getElementById('awbInput').placeholder = ready ? "READY" : "LOCKED";
-        if(ready) document.getElementById('awbInput').focus();
+        if(ready && keyboardEnabled) {
+            document.getElementById('awbInput').focus();
+        }
     };
-    window.autoFocusScanner = () => { if(!document.getElementById('awbInput').disabled && !document.querySelector('.modal.show')) document.getElementById('awbInput').focus(); };
+    
+    window.autoFocusScanner = () => { 
+        if(!document.getElementById('awbInput').disabled && 
+           !document.querySelector('.modal.show') && 
+           keyboardEnabled) {
+            document.getElementById('awbInput').focus(); 
+        }
+    };
+    
     document.getElementById('awbInput').addEventListener('input', (e) => {
         const val = e.target.value.trim().toUpperCase();
         if(val.length < 4) return;
         setTimeout(() => {
-            if (items.includes(val)) { document.getElementById('sndPolice').play(); alert("DUPLICATE!"); }
-            else { document.getElementById('sndScan').play(); items.unshift(val); renderScanList(); }
+            if (items.includes(val)) { 
+                document.getElementById('sndPolice').play(); 
+                alert("DUPLICATE!"); 
+                window.speakCount('Duplicate');
+            }
+            else { 
+                document.getElementById('sndScan').play(); 
+                items.unshift(val); 
+                
+                // Track scan timestamp
+                scanTimestamps.push(Date.now());
+                
+                renderScanList();
+                updateVisualCounter(items.length);
+                updateScanRate();
+                
+                // Flash effect on scanner card
+                const scannerCard = document.querySelector('#scannerView .col-lg-7.card');
+                scannerCard.classList.add('flash-success');
+                setTimeout(() => scannerCard.classList.remove('flash-success'), 500);
+                
+                // Announce the new count
+                window.speakCount(items.length);
+            }
             e.target.value = '';
         }, 150);
     });
+    
     function renderScanList() { 
         document.getElementById('scanBody').innerHTML = items.map((a, i) => `<tr><td>${items.length - i}</td><td><input type="text" class="form-control form-control-sm text-center" value="${a}" onchange="window.editUserAwb(${i}, this.value)"></td><td><button class="btn btn-sm btn-danger" onclick="window.removeUserAwb(${i})">X</button></td></tr>`).join(''); 
         document.getElementById('totalCount').innerText = items.length; 
     }
+    
     window.editUserAwb = (index, newVal) => { items[index] = newVal.toUpperCase(); };
-    window.removeUserAwb = (index) => { items.splice(index, 1); renderScanList(); };
+    
+    window.removeUserAwb = (index) => { 
+        items.splice(index, 1); 
+        renderScanList();
+        updateVisualCounter(items.length);
+        updateScanRate();
+        // Announce updated count
+        window.speakCount(items.length);
+    };
 
-    window.showSyncConfirmation = () => { if(!items.length) return alert("Scan items first"); document.getElementById('confCount').innerText = items.length; syncModal.show(); };
+    window.showSyncConfirmation = () => { 
+        if(!items.length) return alert("Scan items first"); 
+        document.getElementById('confCount').innerText = items.length; 
+        // Announce total before sync
+        window.speakCount(`Total ${items.length} parcels`);
+        syncModal.show(); 
+    };
+    
     window.finalSyncAction = async () => {
         syncModal.hide(); loader.style.display = 'flex';
         const manifestData = { operator: opName, courier: document.getElementById('courierSelect').value, awbs: [...items].reverse(), count: items.length };
         try {
             await addDoc(collection(db, "manifests"), { ...manifestData, time: serverTimestamp(), creationDay: today, emailed: true });
             await fetch('https://medika-backend-fw91.onrender.com/send-manifest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(manifestData) });
-            items = []; renderScanList(); alert("✅ Synced & Emailed!");
+            items = []; 
+            renderScanList();
+            updateVisualCounter(0);
+            scanTimestamps = [];
+            updateScanRate();
+            alert("✅ Synced & Emailed!");
+            window.speakCount('Sync complete');
         } catch (e) { alert("Error: " + e.message); } finally { loader.style.display = 'none'; }
     };
 
