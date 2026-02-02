@@ -4,580 +4,649 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medika Bazaar | AWB Master Pro</title>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- SheetJS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-    <!-- jsPDF + autoTable -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
-
     <style>
-        :root {
-            --medika: #004a99;
-            --medika-dark: #003366;
-            --success: #28a745;
-            --danger: #dc3545;
-            --locked: #f8f9fa;
-            --ready: #fffde7;
-        }
+        :root { --medika: #004a99; --danger: #dc3545; --locked: #e9ecef; --ready: #fffde7; }
+        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
+        .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
+        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.3s; }
+        #scannerView, #adminView, #printView { display: none; }
+        .status-badge { cursor: pointer; transition: 0.2s; }
+        .status-badge:hover { opacity: 0.7; transform: scale(1.05); }
 
-        body {
-            background: #f5f7fa;
-            font-family: system-ui, -apple-system, sans-serif;
+        #loaderOverlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.9); z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
         }
+        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--medika); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .navbar {
-            background: var(--medika);
-            border-bottom: 4px solid #e74c3c;
-        }
-
-        .card {
-            border: none;
-            border-radius: 16px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 32px rgba(0,0,0,0.12);
-        }
-
-        .scan-input {
-            font-size: 2.6rem;
-            height: 90px;
-            font-weight: 700;
-            text-align: center;
-            background: var(--locked);
-            border: 4px solid #ced4da;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-        .scan-input:focus {
-            border-color: var(--medika);
-            box-shadow: 0 0 0 0.35rem rgba(0,74,153,0.22);
-            background: white;
-        }
-        .scan-input::placeholder {
-            color: #adb5bd;
-            opacity: 1;
-        }
-
-        .counter-display {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 16px;
-            padding: 28px 20px;
-            box-shadow: 0 10px 30px rgba(102,126,234,0.3);
-            position: relative;
-            overflow: hidden;
-            transition: transform 0.3s ease;
-        }
-        .counter-display:hover {
-            transform: scale(1.015);
-        }
-        .counter-number {
-            font-size: 7rem;
-            font-weight: 900;
-            line-height: 1;
-            text-shadow: 0 5px 15px rgba(0,0,0,0.45);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .counter-number.pulse {
-            animation: pulseNumber 0.7s ease-out;
-        }
-        @keyframes pulseNumber {
-            0%   { transform: scale(1); }
-            40%  { transform: scale(1.18); color: #ffd700; }
-            100% { transform: scale(1); }
-        }
-
-        .stat-value {
-            font-size: 2.4rem;
-            font-weight: 700;
-        }
-
-        .voice-badge {
-            position: absolute;
-            top: 14px;
-            right: 14px;
-            font-size: 1rem;
-            padding: 6px 12px;
-            cursor: pointer;
-            transition: all 0.25s ease;
-        }
-        .voice-badge:hover {
-            transform: scale(1.08);
-        }
-
+        /* Keyboard Toggle Button */
         .keyboard-toggle {
             position: fixed;
-            bottom: 28px;
-            right: 28px;
-            width: 68px;
-            height: 68px;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             background: var(--medika);
             color: white;
-            font-size: 1.9rem;
             border: none;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            font-size: 24px;
+            cursor: pointer;
             z-index: 1000;
+            transition: all 0.3s;
         }
         .keyboard-toggle:hover {
-            transform: scale(1.12) translateY(-4px);
-            background: var(--medika-dark);
+            transform: scale(1.1);
+            background: #003377;
         }
         .keyboard-toggle.disabled {
             background: #6c757d;
         }
 
-        .btn-success, .btn-primary, .btn-info, .btn-dark {
-            transition: all 0.25s ease;
+        /* Voice Control Badge */
+        .voice-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            transition: 0.2s;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+        .voice-badge:hover {
+            transform: scale(1.1);
         }
 
+        /* Visual Counter Display */
+        .counter-display {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            overflow: hidden;
+        }
+        .counter-display::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        .counter-number {
+            font-size: 5rem;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+            line-height: 1;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        .counter-number.pulse-animation {
+            animation: countPulse 0.6s ease-out;
+        }
+        @keyframes countPulse {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.3); color: #ffd700; }
+            100% { transform: scale(1); }
+        }
+        .counter-label {
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.9);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+            margin-top: 10px;
+        }
+        .counter-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        .stat-item {
+            text-align: center;
+            color: white;
+        }
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            text-transform: uppercase;
+        }
+        .progress-ring {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            width: 80px;
+            height: 80px;
+        }
+        .progress-ring circle {
+            fill: none;
+            stroke: rgba(255,255,255,0.3);
+            stroke-width: 8;
+        }
+        .progress-ring .progress {
+            stroke: #ffd700;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        /* Scan Flash Effect */
+        @keyframes scanFlash {
+            0% { background-color: inherit; }
+            50% { background-color: rgba(40, 167, 69, 0.3); }
+            100% { background-color: inherit; }
+        }
         .flash-success {
-            animation: flashGreen 0.6s ease-out;
-        }
-        @keyframes flashGreen {
-            0%   { background: rgba(40,167,69,0); }
-            30%  { background: rgba(40,167,69,0.25); }
-            100% { background: rgba(40,167,69,0); }
-        }
-
-        .fade-in {
-            animation: fadeIn 0.6s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .modal.fade .modal-dialog {
-            transform: scale(0.8);
-            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .modal.show .modal-dialog {
-            transform: scale(1);
+            animation: scanFlash 0.5s ease-out;
         }
 
         @media print {
-            .no-print { display: none !important; }
-            #printView { display: block !important; }
+            body * { visibility: hidden; }
+            #printView, #printView * { visibility: visible; }
+            #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; padding: 10px; }
+            .print-table { width: 100%; border-collapse: collapse; border: 1px solid black; }
+            .print-table th, .print-table td { border: 1px solid black; padding: 4px; text-align: center; font-size: 10pt; }
+            .keyboard-toggle { display: none !important; }
         }
     </style>
 </head>
-<body>
+<body onclick="window.autoFocusScanner()">
 
 <div id="loaderOverlay">
-    <div class="spinner mb-4"></div>
+    <div class="spinner mb-3"></div>
     <h5 class="fw-bold text-primary">Processing...</h5>
 </div>
 
-<!-- Print layout -->
-<div id="printView" style="display:none; padding:20px;">
-    <h2 class="text-center fw-bold mb-4">MANIFEST</h2>
-    <div class="d-flex justify-content-between mb-4">
-        <h3 id="p-courier" class="fw-bold"></h3>
-        <h3 id="p-count" class="border border-dark px-4 py-2 rounded-pill"></h3>
+<div id="printView">
+    <div class="text-center h2 fw-bold text-decoration-underline">MANIFEST</div>
+    <div class="d-flex justify-content-between mt-3">
+        <h1 id="p-courier" class="fw-bold"></h1>
+        <h1 id="p-count" class="border border-dark px-3 rounded-circle"></h1>
     </div>
-    <p class="mb-4">Operator: <b id="p-op"></b> • Date: <b id="p-date"></b></p>
-    <div id="p-grid" style="display:grid; gap:20px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));"></div>
+    <hr>
+    <p>Op: <b id="p-op"></b> | Date: <b id="p-date"></b></p>
+    <div class="print-grid mt-3" id="p-grid-container" style="display: grid; gap: 10px;"></div>
 </div>
 
-<nav class="navbar navbar-dark py-3 no-print">
-    <div class="container-fluid">
-        <span class="fw-bold fs-4">MEDIKA BAZAAR LOGISTICS</span>
-        <button class="btn btn-outline-light btn-sm px-4" onclick="location.reload()">LOGOUT</button>
-    </div>
-</nav>
+<nav class="navbar py-3 no-print shadow"><div class="container d-flex justify-content-between"><b>MEDIKA BAZAAR LOGISTICS</b><button class="btn btn-sm btn-outline-light" onclick="location.reload()">LOGOUT</button></div></nav>
 
-<button id="keyboardToggle" class="keyboard-toggle" onclick="toggleKeyboard()" title="Toggle keyboard">⌨️</button>
+<!-- Keyboard Toggle Button -->
+<button id="keyboardToggle" class="keyboard-toggle no-print" onclick="window.toggleKeyboard()" title="Toggle On-Screen Keyboard">
+    ⌨️
+</button>
 
 <div class="container mt-4 no-print">
-
-    <!-- Login -->
     <div id="loginView" class="row justify-content-center mt-5">
-        <div class="col-md-5 col-lg-4">
-            <div class="card p-5 text-center shadow fade-in">
-                <h3 class="mb-4 text-primary fw-bold">Logistics Login</h3>
-                <input type="text" id="loginInput" class="form-control form-control-lg text-center mb-4" placeholder="Name or Admin pass" autocomplete="off">
-                <button class="btn btn-primary btn-lg w-100 fw-bold" onclick="handleLogin()">ENTER</button>
+        <div class="col-md-5 card p-5 text-center shadow">
+            <h3 class="mb-4 text-primary">Logistics Login</h3>
+            <input type="text" id="loginInput" class="form-control mb-3 text-center fs-4" placeholder="Name or Admin Pass">
+            <button class="btn btn-primary w-100 btn-lg shadow" onclick="window.handleLogin()">ENTER</button>
+        </div>
+    </div>
+
+    <div id="scannerView" class="row g-4">
+        <div class="col-lg-5">
+            <!-- Visual Counter Display -->
+            <div class="counter-display text-center">
+                <div class="counter-number" id="visualCounter">0</div>
+                <div class="counter-label">Parcels Scanned</div>
+                <div class="counter-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="scanRate">0</span>
+                        <span class="stat-label">Per Min</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="sessionTime">0:00</span>
+                        <span class="stat-label">Session</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="lastScan">--</span>
+                        <span class="stat-label">Last Scan</span>
+                    </div>
+                </div>
+                <!-- Progress Ring -->
+                <svg class="progress-ring" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40"></circle>
+                    <circle cx="50" cy="50" r="40" class="progress" id="progressCircle" 
+                            stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+                </svg>
+            </div>
+
+            <div class="card p-4 shadow-sm border-top border-primary border-3 text-center position-relative">
+                <!-- Voice Toggle Badge -->
+                <span class="voice-badge badge bg-success" onclick="window.toggleVoice()" id="voiceBadge" title="Toggle Voice Announcements">
+                    🔊 Voice ON
+                </span>
+
+                <p>Operator: <b id="displayUser"></b></p>
+                <select id="courierSelect" class="form-select form-select-lg mb-3 fw-bold" onchange="window.handleCourierChange()">
+                    <option value="">-- SELECT COURIER --</option>
+                    <option value="ST COURIER">ST COURIER</option>
+                    <option value="BLUEDART">BLUEDART</option>
+                    <option value="XPRESS BEES">XPRESS BEES</option>
+                    <option value="DTDC">DTDC</option>
+                    <option value="DELIVERY">DELIVERY</option>
+                </select>
+                <input type="text" id="awbInput" class="form-control scan-input" placeholder="LOCKED" disabled>
+                <div class="d-grid gap-2 mt-3">
+                    <button class="btn btn-success btn-lg fw-bold" onclick="window.showSyncConfirmation()">COMPLETE & SYNC</button>
+                    <button class="btn btn-dark" onclick="window.userPrint()">PRINT PREVIEW</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-7 card p-3 shadow-sm border-top border-primary border-3">
+            <h5 class="text-primary mb-3">Scanned Parcels: <span id="totalCount" class="badge bg-primary">0</span></h5>
+            <div class="table-responsive" style="max-height: 450px;">
+                <table class="table table-hover text-center">
+                    <thead><tr><th>SL</th><th>AWB Number</th><th>Action</th></tr></thead>
+                    <tbody id="scanBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- Scanner View -->
-    <div id="scannerView" style="display:none;">
-        <div class="row g-4">
-            <!-- Left – Counter & Input -->
-            <div class="col-lg-5">
-                <div class="counter-display text-center mb-4 fade-in">
-                    <div class="counter-number" id="visualCounter">0</div>
-                    <div class="counter-label">Parcels Scanned</div>
-
-                    <div class="d-flex justify-content-around mt-4">
-                        <div class="text-center">
-                            <div class="stat-value" id="scanRate">0</div>
-                            <div class="stat-label small">PER MIN</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="stat-value" id="sessionTime">0:00</div>
-                            <div class="stat-label small">SESSION</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="stat-value" id="lastScan">--</div>
-                            <div class="stat-label small">LAST SCAN</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card p-4 position-relative fade-in">
-                    <span class="voice-badge badge bg-success px-3 py-2 fs-6" id="voiceBadge" onclick="toggleVoice()">🔊 Voice ON</span>
-
-                    <p class="text-center mb-3 fw-bold">Operator: <span id="displayUser"></span></p>
-
-                    <select id="courierSelect" class="form-select form-select-lg mb-3 fw-bold" onchange="handleCourierChange()">
-                        <option value="">-- SELECT COURIER --</option>
+    <div id="adminView">
+        <div class="card p-3 shadow-sm mb-4 border-start border-primary border-5">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-2"><label class="small fw-bold">From</label><input type="date" id="reportFrom" class="form-control"></div>
+                <div class="col-md-2"><label class="small fw-bold">To</label><input type="date" id="reportTo" class="form-control"></div>
+                <div class="col-md-3">
+                    <select id="reportBucket" class="form-select">
+                        <option value="ALL">ALL BUCKETS</option>
                         <option value="ST COURIER">ST COURIER</option>
                         <option value="BLUEDART">BLUEDART</option>
                         <option value="XPRESS BEES">XPRESS BEES</option>
                         <option value="DTDC">DTDC</option>
                         <option value="DELIVERY">DELIVERY</option>
                     </select>
-
-                    <input type="text" id="awbInput" class="scan-input form-control" placeholder="LOCKED" disabled autocomplete="off">
-
-                    <div class="d-grid gap-3 mt-4">
-                        <button class="btn btn-success btn-lg fw-bold" onclick="showSyncConfirmation()">COMPLETE & SYNC</button>
-                        <div class="btn-group w-100">
-                            <button class="btn btn-outline-dark" onclick="triggerPrint()">Print Preview</button>
-                            <button class="btn btn-outline-primary" onclick="exportToPDF()">Export PDF</button>
-                        </div>
-                    </div>
                 </div>
-            </div>
-
-            <!-- Right – List -->
-            <div class="col-lg-7">
-                <div class="card p-3 fade-in">
-                    <h5 class="text-primary mb-3">
-                        Scanned Parcels
-                        <span id="totalCount" class="badge bg-primary ms-2">0</span>
-                    </h5>
-                    <div class="table-responsive" style="max-height:520px;">
-                        <table class="table table-hover table-sm">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>AWB Number</th>
-                                    <th style="width:60px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="scanBody"></tbody>
-                        </table>
-                    </div>
+                <div class="col-md-3 d-flex gap-1">
+                    <button class="btn btn-primary btn-sm flex-fill" onclick="window.exportAdminExcel(false)">Range Excel</button>
+                    <button class="btn btn-danger btn-sm flex-fill" onclick="window.exportAdminExcel(true)">Download All</button>
                 </div>
+                <div class="col-md-2"><input type="text" id="adminSearch" class="form-control" placeholder="🔍 Search..." oninput="window.renderAdminUI()"></div>
             </div>
         </div>
-    </div>
 
+        <div class="row mb-3 bg-white p-3 rounded shadow-sm mx-0 align-items-center">
+            <div class="col-md-4"><input type="date" id="filterDate" class="form-control" onchange="window.renderAdminUI()"></div>
+            <div class="col-md-4 text-center"><h4>Daily Vol: <span id="dayVolume" class="text-primary fw-bold">0</span></h4></div>
+        </div>
+        <div id="adminGrid" class="row"></div>
+    </div>
 </div>
 
-<!-- Sync Confirmation Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header bg-dark text-white"><h5>Edit Manifest</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="fw-bold">Courier</label><input type="text" id="editCourierType" class="form-control"></div>
+                <table class="table table-bordered text-center"><tbody id="modalTableBody"></tbody>
+                    <tfoot><tr><td><input type="text" id="newAwbInput" class="form-control" placeholder="Add AWB"></td><td><button class="btn btn-primary" onclick="window.addNewAwb()">+ ADD</button></td></tr></tfoot>
+                </table>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success w-100" onclick="window.saveManifestChanges()">UPDATE CLOUD</button></div>
+    </div></div>
+</div>
+
 <div class="modal fade" id="syncModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">Confirm Sync</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center py-5">
-                <h1 id="confCount" class="display-3 fw-bold mb-3">0</h1>
-                <p class="lead mb-0">parcels will be synced & emailed</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success px-5 fw-bold" onclick="doSync()">CONFIRM</button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-success border-4"><div class="modal-body text-center"><h1 id="confCount" class="display-3 fw-bold"></h1><p>Sync & Email Excel to <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="9fcdfef5faecf7edfef4abaeacdff8f2fef6f3b1fcf0f2">[email&#160;protected]</a>?</p><button class="btn btn-success w-100 btn-lg" onclick="window.finalSyncAction()">CONFIRM</button></div></div></div>
 </div>
 
-<!-- Audio -->
-<audio id="beepOk"    src="https://assets.mixkit.co/sfx/preview/mixkit-confirmation-tone-2869.mp3"></audio>
-<audio id="beepError" src="https://assets.mixkit.co/sfx/preview/mixkit-error-tone-2909.mp3"></audio>
+<audio id="sndScan" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
+<audio id="sndPolice" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-<script>
-// ────────────────────────────────────────────────
-// Globals & Elements
-// ────────────────────────────────────────────────
-let items = [];
-let opName = "";
-let voiceEnabled = true;
-let keyboardEnabled = true;
-let sessionStartTime = null;
-let scanTimestamps = [];
-let sessionTimer = null;
+    const firebaseConfig = { apiKey: "AIzaSyCynM9SUrwBGKjzuXuNjnbQERLjnhM4j2k", authDomain: "awbscan-49c04.firebaseapp.com", projectId: "awbscan-49c04", storageBucket: "awbscan-49c04.firebasestorage.app", messagingSenderId: "269309952447", appId: "1:269309952447:web:7e0e524b157e7a9904610a" };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-const today = new Date().toISOString().split('T')[0];
+    let items = [], opName = "", cloudData = [], dataVault = {}, activeManifestId = null;
+    let voiceEnabled = true; // Voice announcement toggle
+    let keyboardEnabled = true; // Keyboard input toggle
+    let sessionStartTime = null; // Track session start
+    let scanTimestamps = []; // Track scan times for rate calculation
+    let sessionTimer = null; // Session time interval
 
-const els = {
-    visualCounter: document.getElementById('visualCounter'),
-    scanRate:      document.getElementById('scanRate'),
-    sessionTime:   document.getElementById('sessionTime'),
-    lastScan:      document.getElementById('lastScan'),
-    totalCount:    document.getElementById('totalCount'),
-    scanBody:      document.getElementById('scanBody'),
-    awbInput:      document.getElementById('awbInput'),
-    courierSelect: document.getElementById('courierSelect'),
-    displayUser:   document.getElementById('displayUser'),
-    voiceBadge:    document.getElementById('voiceBadge'),
-    keyboardBtn:   document.getElementById('keyboardToggle'),
-    confCount:     document.getElementById('confCount')
-};
+    const syncModal = new bootstrap.Modal(document.getElementById('syncModal'));
+    const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    const loader = document.getElementById('loaderOverlay');
 
-// ────────────────────────────────────────────────
-// Voice & Keyboard
-// ────────────────────────────────────────────────
-function speak(text) {
-    if (!voiceEnabled) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    speechSynthesis.speak(utterance);
-}
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('filterDate').value = today;
+    document.getElementById('reportFrom').value = today;
+    document.getElementById('reportTo').value = today;
 
-function toggleVoice() {
-    voiceEnabled = !voiceEnabled;
-    els.voiceBadge.textContent = voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
-    els.voiceBadge.className = voiceEnabled ? 'voice-badge badge bg-success px-3 py-2 fs-6' : 'voice-badge badge bg-secondary px-3 py-2 fs-6';
-    speak(voiceEnabled ? 'Voice enabled' : 'Voice disabled');
-}
+    // ========== VOICE ANNOUNCEMENT FUNCTION ==========
+    window.speakCount = (count) => {
+        if (!voiceEnabled) return;
 
-function toggleKeyboard() {
-    keyboardEnabled = !keyboardEnabled;
-    els.keyboardBtn.classList.toggle('disabled', !keyboardEnabled);
-    els.awbInput.readOnly = !keyboardEnabled;
-    if (keyboardEnabled && !els.awbInput.disabled) els.awbInput.focus();
-}
+        if ('speechSynthesis' in window) {
+            // Cancel any ongoing speech
+            window.speechSynthesis.cancel();
 
-// ────────────────────────────────────────────────
-// Login & Session
-// ────────────────────────────────────────────────
-function handleLogin() {
-    const val = document.getElementById('loginInput').value.trim();
-    if (!val) return alert("Enter name or passcode");
+            const utterance = new SpeechSynthesisUtterance(`${count}`);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            utterance.lang = 'en-US';
 
-    if (val === "0000") {
-        document.getElementById('loginView').style.display = 'none';
-        document.getElementById('scannerView').style.display = 'none';
-        document.getElementById('adminView').style.display = 'block';
-        return;
-    }
+            window.speechSynthesis.speak(utterance);
+        }
+    };
 
-    opName = val;
-    els.displayUser.textContent = opName;
+    // ========== VOICE TOGGLE ==========
+    window.toggleVoice = () => {
+        voiceEnabled = !voiceEnabled;
+        const badge = document.getElementById('voiceBadge');
+        if (voiceEnabled) {
+            badge.className = 'voice-badge badge bg-success';
+            badge.innerHTML = '🔊 Voice ON';
+            window.speakCount('Voice enabled');
+        } else {
+            badge.className = 'voice-badge badge bg-secondary';
+            badge.innerHTML = '🔇 Voice OFF';
+        }
+    };
 
-    document.getElementById('loginView').style.display = 'none';
-    document.getElementById('scannerView').style.display = 'block';
+    // ========== KEYBOARD TOGGLE ==========
+    window.toggleKeyboard = () => {
+        const input = document.getElementById('awbInput');
+        const toggleBtn = document.getElementById('keyboardToggle');
 
-    startSession();
-}
+        keyboardEnabled = !keyboardEnabled;
 
-function startSession() {
-    sessionStartTime = Date.now();
-    scanTimestamps = [];
-    sessionTimer = setInterval(() => {
+        if (keyboardEnabled) {
+            input.removeAttribute('readonly');
+            toggleBtn.classList.remove('disabled');
+            toggleBtn.title = 'Disable Keyboard Input';
+            alert('✅ Keyboard Input ENABLED');
+        } else {
+            input.setAttribute('readonly', 'readonly');
+            toggleBtn.classList.add('disabled');
+            toggleBtn.title = 'Enable Keyboard Input';
+            alert('🔒 Keyboard Input DISABLED (Scanner Only Mode)');
+        }
+    };
+
+    window.handleLogin = () => {
+        const val = document.getElementById('loginInput').value.trim();
+        if(val === "0000") { showState('adminView'); startLiveSync(); }
+        else if(val) { 
+            opName = val; 
+            document.getElementById('displayUser').innerText = opName; 
+            showState('scannerView');
+            startSessionTracking();
+        }
+    };
+
+    // Start session tracking
+    function startSessionTracking() {
+        sessionStartTime = Date.now();
+        scanTimestamps = [];
         updateSessionTimer();
-        updateScanRate();
-    }, 1000);
-}
-
-function updateSessionTimer() {
-    if (!sessionStartTime) return;
-    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
-    const m = Math.floor(elapsed / 60);
-    const s = elapsed % 60;
-    els.sessionTime.textContent = `\( {m}: \){s.toString().padStart(2,'0')}`;
-}
-
-function updateScanRate() {
-    const now = Date.now();
-    scanTimestamps = scanTimestamps.filter(t => now - t < 60000);
-    els.scanRate.textContent = scanTimestamps.length;
-}
-
-function updateLastScan() {
-    const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    els.lastScan.textContent = t;
-}
-
-// ────────────────────────────────────────────────
-// Scanning
-// ────────────────────────────────────────────────
-els.awbInput.addEventListener('change', function() {
-    const code = this.value.trim().toUpperCase();
-    if (code.length < 6) {
-        this.value = '';
-        return;
+        sessionTimer = setInterval(updateSessionTimer, 1000);
     }
 
-    if (items.includes(code)) {
-        document.getElementById('beepError').play().catch(()=>{});
-        alert("Duplicate AWB!");
-        speak("Duplicate");
-        this.value = '';
-        return;
+    // Update session time display
+    function updateSessionTimer() {
+        if (!sessionStartTime) return;
+        const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('sessionTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
 
-    items.push(code);
-    scanTimestamps.push(Date.now());
+    // Calculate scan rate (scans per minute)
+    function updateScanRate() {
+        const now = Date.now();
+        // Keep only scans from last minute
+        scanTimestamps = scanTimestamps.filter(time => now - time < 60000);
+        const rate = scanTimestamps.length;
+        document.getElementById('scanRate').textContent = rate;
+    }
 
-    renderScanList();
-    updateVisualCounter(items.length);
-    updateScanRate();
-    updateLastScan();
-    speak(items.length);
+       // Update visual counter with animation
+    function updateVisualCounter(count) {
+        const counterEl = document.getElementById('visualCounter');
+        counterEl.textContent = count;
 
-    document.getElementById('beepOk').play().catch(()=>{});
+        // Add pulse animation
+        counterEl.classList.remove('pulse-animation');
+        void counterEl.offsetWidth; // Trigger reflow
+        counterEl.classList.add('pulse-animation');
 
-    // Visual feedback
-    const card = document.querySelector('#scannerView .card');
-    card.classList.add('flash-success');
-    setTimeout(() => card.classList.remove('flash-success'), 700);
+        // Update progress ring (example: max 100 parcels for full circle)
+        const maxParcels = 100;
+        const percentage = Math.min(count / maxParcels, 1);
+        const circumference = 251.2;
+        const offset = circumference * (1 - percentage);
+        document.getElementById('progressCircle').style.strokeDashoffset = offset;
 
-    this.value = '';
-    if (keyboardEnabled) this.focus();
-});
+        // Update last scan time
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('lastScan').textContent = timeStr.split(' ')[0];
+    }
+    function showState(id) { 
+        ['loginView', 'scannerView', 'adminView'].forEach(v => document.getElementById(v).style.display = 'none'); 
+        document.getElementById(id).style.display = 'block'; 
 
-function renderScanList() {
-    els.scanBody.innerHTML = items.map((awb, i) => `
-        <tr class="fade-in">
-            <td class="fw-bold">${i+1}</td>
-            <td class="font-monospace">${awb}</td>
-            <td>
-                <button class="btn btn-sm btn-outline-danger" onclick="removeAwb(${i})">×</button>
-            </td>
-        </tr>
-    `).join('');
-    els.totalCount.textContent = items.length;
-}
+        // Show/hide keyboard toggle button
+        const toggleBtn = document.getElementById('keyboardToggle');
+        if (id === 'scannerView') {
+            toggleBtn.style.display = 'block';
+        } else {
+            toggleBtn.style.display = 'none';
+        }
+    }
 
-window.removeAwb = function(index) {
-    items.splice(index, 1);
-    renderScanList();
-    updateVisualCounter(items.length);
-    updateScanRate();
-    speak(items.length);
-};
+    // SCANNER & SYNC
+    window.handleCourierChange = () => {
+        const ready = document.getElementById('courierSelect').value !== "";
+        document.getElementById('awbInput').disabled = !ready;
+        document.getElementById('awbInput').placeholder = ready ? "READY" : "LOCKED";
+        if(ready && keyboardEnabled) {
+            document.getElementById('awbInput').focus();
+        }
+    };
 
-function updateVisualCounter(count) {
-    els.visualCounter.textContent = count;
-    els.visualCounter.classList.add('pulse');
-    setTimeout(() => els.visualCounter.classList.remove('pulse'), 800);
-}
+    window.autoFocusScanner = () => { 
+        if(!document.getElementById('awbInput').disabled && 
+           !document.querySelector('.modal.show') && 
+           keyboardEnabled) {
+            document.getElementById('awbInput').focus(); 
+        }
+    };
 
-// ────────────────────────────────────────────────
-// Courier & Sync
-// ────────────────────────────────────────────────
-function handleCourierChange() {
-    const ready = els.courierSelect.value !== "";
-    els.awbInput.disabled = !ready;
-    els.awbInput.placeholder = ready ? "READY – Scan AWB" : "LOCKED";
-    if (ready && keyboardEnabled) els.awbInput.focus();
-}
+    document.getElementById('awbInput').addEventListener('input', (e) => {
+        const val = e.target.value.trim().toUpperCase();
+        if(val.length < 4) return;
+        setTimeout(() => {
+            if (items.includes(val)) { 
+                document.getElementById('sndPolice').play(); 
+                alert("DUPLICATE!"); 
+                window.speakCount('Duplicate');
+            }
+            else { 
+                document.getElementById('sndScan').play(); 
+                items.unshift(val); 
 
-function showSyncConfirmation() {
-    if (items.length === 0) return alert("No parcels scanned.");
-    els.confCount.textContent = items.length;
-    new bootstrap.Modal(document.getElementById('syncModal')).show();
-}
+                // Track scan timestamp
+                scanTimestamps.push(Date.now());
 
-window.doSync = function() {
-    bootstrap.Modal.getInstance(document.getElementById('syncModal')).hide();
-    document.getElementById('loaderOverlay').style.display = 'flex';
+                renderScanList();
+                updateVisualCounter(items.length);
+                updateScanRate();
 
-    // Simulate backend call
-    setTimeout(() => {
-        alert(`Success!\n${items.length} parcels synced & emailed (mock)`);
-        document.getElementById('loaderOverlay').style.display = 'none';
+                // Flash effect on scanner card
+                const scannerCard = document.querySelector('#scannerView .col-lg-7.card');
+                scannerCard.classList.add('flash-success');
+                setTimeout(() => scannerCard.classList.remove('flash-success'), 500);
 
-        items = [];
-        renderScanList();
-        updateVisualCounter(0);
-        updateScanRate();
-        updateLastScan();
-    }, 1400);
-};
-
-// ────────────────────────────────────────────────
-// PDF Export
-// ────────────────────────────────────────────────
-window.exportToPDF = function() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-
-    doc.setFontSize(20);
-    doc.text(`MANIFEST – ${els.courierSelect.value || 'Unknown'}`, 20, 25);
-
-    doc.setFontSize(12);
-    doc.text(`Operator: ${opName}   |   Date: ${today}   |   Total: ${items.length}`, 20, 38);
-
-    doc.autoTable({
-        startY: 50,
-        head: [['No', 'AWB Number']],
-        body: items.map((awb, i) => [i+1, awb]),
-        theme: 'grid',
-        styles: { fontSize: 10, cellPadding: 4 },
-        headStyles: { fillColor: [0,74,153] },
-        alternateRowStyles: { fillColor: [245,245,245] },
-        columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' } }
+                // Announce the new count
+                window.speakCount(items.length);
+            }
+            e.target.value = '';
+        }, 150);
     });
 
-    doc.save(`manifest-${today}.pdf`);
-};
-
-// ────────────────────────────────────────────────
-// Print Preview
-// ────────────────────────────────────────────────
-window.triggerPrint = function() {
-    const grid = document.getElementById('p-grid');
-    grid.innerHTML = '';
-
-    document.getElementById('p-courier').textContent = els.courierSelect.value || 'Unknown Courier';
-    document.getElementById('p-op').textContent = opName;
-    document.getElementById('p-date').textContent = today;
-    document.getElementById('p-count').textContent = items.length;
-
-    const columns = 2;
-    const perColumn = Math.ceil(items.length / columns);
-
-    for (let c = 0; c < columns; c++) {
-        const chunk = items.slice(c * perColumn, (c + 1) * perColumn);
-        if (!chunk.length) continue;
-
-        let html = '<table class="table table-bordered table-sm"><thead><tr><th>#</th><th>AWB</th></tr></thead><tbody>';
-        chunk.forEach((awb, i) => {
-            html += `<tr><td>\( {c*perColumn + i + 1}</td><td> \){awb}</td></tr>`;
-        });
-        html += '</tbody></table>';
-        grid.innerHTML += html;
+    function renderScanList() { 
+        document.getElementById('scanBody').innerHTML = items.map((a, i) => `<tr><td>${items.length - i}</td><td><input type="text" class="form-control form-control-sm text-center" value="${a}" onchange="window.editUserAwb(${i}, this.value)"></td><td><button class="btn btn-sm btn-danger" onclick="window.removeUserAwb(${i})">X</button></td></tr>`).join(''); 
+        document.getElementById('totalCount').innerText = items.length; 
     }
 
-    window.print();
-};
+    window.editUserAwb = (index, newVal) => { items[index] = newVal.toUpperCase(); };
 
-// Init
-console.log("Medika AWB Master Pro → ready");
+    window.removeUserAwb = (index) => { 
+        items.splice(index, 1); 
+        renderScanList();
+        updateVisualCounter(items.length);
+        updateScanRate();
+        // Announce updated count
+        window.speakCount(items.length);
+    };
+
+    window.showSyncConfirmation = () => { 
+        if(!items.length) return alert("Scan items first"); 
+        document.getElementById('confCount').innerText = items.length; 
+        // Announce total before sync
+        window.speakCount(`Total ${items.length} parcels`);
+        syncModal.show(); 
+    };
+
+    window.finalSyncAction = async () => {
+        syncModal.hide(); loader.style.display = 'flex';
+        const manifestData = { operator: opName, courier: document.getElementById('courierSelect').value, awbs: [...items].reverse(), count: items.length };
+        try {
+            await addDoc(collection(db, "manifests"), { ...manifestData, time: serverTimestamp(), creationDay: today, emailed: true });
+            await fetch('https://medika-backend-fw91.onrender.com/send-manifest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(manifestData) });
+            items = []; 
+            renderScanList();
+            updateVisualCounter(0);
+            scanTimestamps = [];
+            updateScanRate();
+            alert("✅ Synced & Emailed!");
+            window.speakCount('Sync complete');
+        } catch (e) { alert("Error: " + e.message); } finally { loader.style.display = 'none'; }
+    };
+
+    // ADMIN RENDER
+    const startLiveSync = () => { onSnapshot(query(collection(db, "manifests"), orderBy("time", "asc")), (snap) => { cloudData = []; snap.forEach(d => cloudData.push({ id: d.id, ...d.data() })); window.renderAdminUI(); }); };
+
+    window.renderAdminUI = () => {
+        const grid = document.getElementById('adminGrid'), selDate = document.getElementById('filterDate').value, search = document.getElementById('adminSearch').value.toUpperCase();
+        grid.innerHTML = ""; let vol = 0;
+        cloudData.forEach(d => {
+            if(d.creationDay !== selDate) return;
+            if(search && !d.awbs.some(a => a.includes(search))) return;
+            vol += d.count; dataVault[d.id] = d;
+            const statusHtml = d.emailed 
+                ? `<span class="status-badge text-success small fw-bold" onclick="window.toggleManualStatus('${d.id}', false)">✅ Emailed</span>` 
+                : `<span class="status-badge text-warning small fw-bold" onclick="window.toggleManualStatus('${d.id}', true)">⌛ Pending</span>`;
+            const col = document.createElement('div'); col.className = "col-md-4 mb-3";
+            col.innerHTML = `
+                <div class="card p-3 border-top border-primary border-3 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <h6 class="fw-bold mb-0">${d.courier} (${d.count})</h6>
+                        ${statusHtml}
+                    </div>
+                    <p class="small text-muted mb-3">Operator: ${d.operator}</p>
+                    <div class="row g-1">
+                        <div class="col-6"><button class="btn btn-sm btn-dark w-100" onclick="window.triggerPrint('${d.id}')">Print</button></div>
+                        <div class="col-6"><button class="btn btn-sm btn-success w-100" onclick="window.downloadSingleExcel('${d.id}')">Excel</button></div>
+                        <div class="col-6"><button class="btn btn-sm btn-warning w-100 text-white" onclick="window.openAdminEdit('${d.id}')">Edit</button></div>
+                        <div class="col-6"><button class="btn btn-sm btn-outline-danger w-100" onclick="window.delMan('${d.id}')">Del</button></div>
+                    </div>
+                </div>`;
+            grid.prepend(col);
+        });
+        document.getElementById('dayVolume').innerText = vol;
+    };
+
+    // MANUAL OVERRIDE
+    window.toggleManualStatus = async (id, status) => {
+        const msg = status ? "Mark as Emailed?" : "Mark as Pending?";
+        if(confirm(msg)) {
+            await updateDoc(doc(db, "manifests", id), { emailed: status });
+        }
+    };
+
+    window.downloadSingleExcel = (id) => {
+        const d = dataVault[id];
+        const rows = [["SL", "AWB NUMBER"]];
+        d.awbs.forEach((a, i) => rows.push([i+1, a]));
+        const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, "Manifest");
+        XLSX.writeFile(wb, `${d.courier}_${d.creationDay}.xlsx`);
+    };
+
+    window.exportAdminExcel = (allTime) => {
+        const from = document.getElementById('reportFrom').value, to = document.getElementById('reportTo').value, bucket = document.getElementById('reportBucket').value;
+        const master = [["Date", "Courier", "AWB Number", "Operator"]];
+        let found = 0;
+        cloudData.forEach(d => {
+            const inRange = allTime || (d.creationDay >= from && d.creationDay <= to);
+            if(inRange && (bucket === "ALL" || d.courier === bucket)) {
+                d.awbs.forEach(awb => master.push([d.creationDay, d.courier, awb, d.operator]));
+                found++;
+            }
+        });
+        if(!found) return alert("No data found.");
+        const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(master);
+        XLSX.utils.book_append_sheet(wb, ws, "Master Report");
+        XLSX.writeFile(wb, allTime ? "Medika_All_Time.xlsx" : `Medika_Report_${from}_to_${to}.xlsx`);
+    };
+
+    window.openAdminEdit = (id) => { activeManifestId = id; const d = dataVault[id]; document.getElementById('editCourierType').value = d.courier; renderModalTable(); editModal.show(); };
+    function renderModalTable() { const d = dataVault[activeManifestId]; document.getElementById('modalTableBody').innerHTML = d.awbs.map((a, i) => `<tr><td><input class="form-control text-center" value="${a}" onchange="window.updateAdminAwb(${i}, this.value)"></td><td><button class="btn btn-sm btn-danger" onclick="window.removeAdminAwb(${i})">X</button></td></tr>`).join(''); }
+    window.updateAdminAwb = (i, v) => { dataVault[activeManifestId].awbs[i] = v.toUpperCase(); };
+    window.removeAdminAwb = (i) => { dataVault[activeManifestId].awbs.splice(i, 1); renderModalTable(); };
+    window.addNewAwb = () => { const v = document.getElementById('newAwbInput').value.toUpperCase(); if(!v) return; dataVault[activeManifestId].awbs.push(v); document.getElementById('newAwbInput').value = ""; renderModalTable(); };
+    window.saveManifestChanges = async () => { const d = dataVault[activeManifestId]; await updateDoc(doc(db, "manifests", activeManifestId), { courier: document.getElementById('editCourierType').value, awbs: d.awbs, count: d.awbs.length }); editModal.hide(); alert("Updated!"); };
+
+    window.triggerPrint = (id) => {
+        const d = dataVault[id], colNum = parseInt(prompt("Columns (1-4)?", "2")) || 2;
+        document.getElementById('p-courier').innerText = d.courier; document.getElementById('p-op').innerText = d.operator; document.getElementById('p-date').innerText = d.creationDay; document.getElementById('p-count').innerText = d.count;
+        const cont = document.getElementById('p-grid-container'); cont.style.gridTemplateColumns = `repeat(${colNum}, 1fr)`; cont.innerHTML = "";
+        const per = Math.ceil(d.awbs.length / colNum);
+        for(let i = 0; i < colNum; i++) {
+            const chunk = d.awbs.slice(i * per, (i + 1) * per); if(!chunk.length) continue;
+            let t = `<table class="print-table"><thead><tr><th>SL</th><th>AWB</th></tr></thead><tbody>`;
+            t += chunk.map((a, j) => `<tr><td>${(i * per) + j + 1}</td><td>${a}</td></tr>`).join('');
+            cont.innerHTML += t + `</tbody></table>`;
+        }
+        window.print();
+    };
+    window.delMan = async (id) => { if(prompt("Passcode?")==="1234"){ await deleteDoc(doc(db, "manifests", id)); alert("Deleted."); } };
+    window.userPrint = () => { const mId = 'temp'; dataVault[mId] = { courier: document.getElementById('courierSelect').value, operator: opName, awbs: [...items].reverse(), count: items.length, creationDay: today }; window.triggerPrint(mId); };
 </script>
 </body>
 </html>
