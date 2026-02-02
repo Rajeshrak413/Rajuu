@@ -1,75 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Medika Bazaar | AWB Master Pro</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+    <!-- SheetJS for Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- jsPDF + autoTable for PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
+
     <style>
-        :root { --medika: #004a99; --danger: #dc3545; --locked: #e9ecef; --ready: #fffde7; }
-        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
-        .navbar { background: var(--medika); color: white; border-bottom: 4px solid #e74c3c; }
-        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .scan-input { font-size: 2.2rem; height: 80px; border: 4px solid #ced4da; text-align: center; font-weight: bold; background: var(--locked); transition: 0.3s; }
-        #scannerView, #adminView, #printView { display: none; }
-        .status-badge { cursor: pointer; transition: 0.2s; }
-        .status-badge:hover { opacity: 0.7; transform: scale(1.05); }
-
+        :root {
+            --medika: #004a99;
+            --danger: #dc3545;
+            --locked: #e9ecef;
+            --ready: #fffde7;
+        }
+        body {
+            background: #f4f7f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: var(--medika);
+            color: white;
+            border-bottom: 4px solid #e74c3c;
+        }
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .scan-input {
+            font-size: 2.4rem;
+            height: 85px;
+            text-align: center;
+            font-weight: bold;
+            background: var(--locked);
+            border: 4px solid #ced4da;
+            transition: all 0.25s;
+        }
+        .scan-input:focus {
+            border-color: var(--medika);
+            box-shadow: 0 0 0 0.25rem rgba(0,74,153,0.25);
+        }
         #loaderOverlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.9); z-index: 9999;
-            flex-direction: column; align-items: center; justify-content: center;
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.92);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--medika); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        .keyboard-toggle {
-            position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%;
-            background: var(--medika); color: white; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            font-size: 24px; cursor: pointer; z-index: 1000; transition: all 0.3s;
+        .spinner {
+            width: 56px;
+            height: 56px;
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid var(--medika);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        .keyboard-toggle:hover { transform: scale(1.1); background: #003377; }
-        .keyboard-toggle.disabled { background: #6c757d; }
-
-        .voice-badge { position: absolute; top: 10px; right: 10px; cursor: pointer; transition: 0.2s; }
-        .voice-badge:hover { transform: scale(1.1); }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .counter-display {
-            position: relative; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 20px; padding: 30px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 24px;
+            color: white;
+            box-shadow: 0 8px 25px rgba(102,126,234,0.35);
+            position: relative;
             overflow: hidden;
         }
-        .counter-display::before {
-            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: pulse 3s ease-in-out infinite;
+        .counter-number {
+            font-size: 6rem;
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
-        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.1); opacity: 0.8; } }
-        .counter-number { font-size: 5rem; font-weight: 900; color: white; text-shadow: 0 5px 15px rgba(0,0,0,0.3); position: relative; z-index: 1; line-height: 1; }
-        .counter-number.pulse-animation { animation: countPulse 0.6s ease-out; }
-        @keyframes countPulse { 0% { transform: scale(1); } 30% { transform: scale(1.3); color: #ffd700; } 100% { transform: scale(1); } }
-        .counter-label { font-size: 1.2rem; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 3px; font-weight: 600; position: relative; z-index: 1; margin-top: 10px; }
-        .counter-stats { display: flex; justify-content: space-around; margin-top: 15px; position: relative; z-index: 1; }
-        .stat-item { text-align: center; color: white; }
-        .stat-value { font-size: 1.8rem; font-weight: bold; display: block; }
-        .stat-label { font-size: 0.75rem; opacity: 0.8; text-transform: uppercase; }
-        .progress-ring { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); width: 80px; height: 80px; }
-        .progress-ring circle { fill: none; stroke: rgba(255,255,255,0.3); stroke-width: 8; }
-        .progress-ring .progress { stroke: #ffd700; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease; }
+        .counter-label {
+            font-size: 1.3rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.9;
+            margin-top: 8px;
+        }
+        .stat-value {
+            font-size: 2.1rem;
+            font-weight: 700;
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            opacity: 0.85;
+            text-transform: uppercase;
+        }
 
-        @keyframes scanFlash { 0% { background-color: inherit; } 50% { background-color: rgba(40, 167, 69, 0.3); } 100% { background-color: inherit; } }
-        .flash-success { animation: scanFlash 0.5s ease-out; }
+        .voice-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            cursor: pointer;
+        }
+
+        .keyboard-toggle {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--medika);
+            color: white;
+            font-size: 1.8rem;
+            border: none;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            z-index: 1000;
+        }
+        .keyboard-toggle.disabled {
+            background: #6c757d;
+        }
+
+        .flash-success {
+            animation: flash 0.6s;
+        }
+        @keyframes flash {
+            0%,100% { background-color: transparent; }
+            50% { background-color: rgba(40,167,69,0.15); }
+        }
 
         @media print {
-            body * { visibility: hidden; }
-            #printView, #printView * { visibility: visible; }
-            #printView { position: absolute; left: 0; top: 0; width: 100%; display: block !important; padding: 10px; }
-            .print-table { width: 100%; border-collapse: collapse; border: 1px solid black; }
-            .print-table th, .print-table td { border: 1px solid black; padding: 4px; text-align: center; font-size: 10pt; }
-            .keyboard-toggle, .no-print { display: none !important; }
+            .no-print { display: none !important; }
+            #printView { display: block !important; }
         }
     </style>
 </head>
@@ -80,103 +145,142 @@
     <h5 class="fw-bold text-primary">Processing...</h5>
 </div>
 
-<div id="printView">
-    <div class="text-center h2 fw-bold text-decoration-underline">MANIFEST</div>
-    <div class="d-flex justify-content-between mt-3">
-        <h1 id="p-courier" class="fw-bold"></h1>
-        <h1 id="p-count" class="border border-dark px-3 rounded-circle"></h1>
+<!-- Print layout -->
+<div id="printView" style="display:none;">
+    <h2 class="text-center fw-bold text-decoration-underline mb-4">MANIFEST</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 id="p-courier" class="fw-bold"></h3>
+        <h3 id="p-count" class="border border-dark px-4 py-2 rounded-pill"></h3>
     </div>
-    <hr>
-    <p>Op: <b id="p-op"></b> | Date: <b id="p-date"></b></p>
-    <div class="print-grid mt-3" id="p-grid-container" style="display: grid; gap: 10px;"></div>
+    <p>Operator: <b id="p-op"></b>  |  Date: <b id="p-date"></b></p>
+    <div id="p-grid" style="display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));"></div>
 </div>
 
-<nav class="navbar py-3 no-print shadow">
-    <div class="container d-flex justify-content-between">
-        <b>MEDIKA BAZAAR LOGISTICS</b>
-        <button class="btn btn-sm btn-outline-light" onclick="location.reload()">LOGOUT</button>
+<nav class="navbar navbar-dark py-3 no-print">
+    <div class="container-fluid">
+        <span class="fw-bold fs-5">MEDIKA BAZAAR LOGISTICS</span>
+        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT</button>
     </div>
 </nav>
 
-<button id="keyboardToggle" class="keyboard-toggle no-print" onclick="toggleKeyboard()" title="Toggle Keyboard">⌨️</button>
+<button id="keyboardToggle" class="keyboard-toggle" onclick="toggleKeyboard()" title="Toggle keyboard input">⌨️</button>
 
 <div class="container mt-4 no-print">
+
+    <!-- Login -->
     <div id="loginView" class="row justify-content-center mt-5">
-        <div class="col-md-5 card p-5 text-center shadow">
-            <h3 class="mb-4 text-primary">Logistics Login</h3>
-            <input type="text" id="loginInput" class="form-control mb-3 text-center fs-4" placeholder="Name or Admin Pass">
-            <button class="btn btn-primary w-100 btn-lg shadow" onclick="handleLogin()">ENTER</button>
-        </div>
-    </div>
-
-    <div id="scannerView" class="row g-4" style="display:none;">
-        <div class="col-lg-5">
-            <div class="counter-display text-center">
-                <div class="counter-number" id="visualCounter">0</div>
-                <div class="counter-label">Parcels Scanned</div>
-                <div class="counter-stats">
-                    <div class="stat-item">
-                        <span class="stat-value" id="scanRate">0</span>
-                        <span class="stat-label">Per Min</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="sessionTime">0:00</span>
-                        <span class="stat-label">Session</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="lastScan">--</span>
-                        <span class="stat-label">Last Scan</span>
-                    </div>
-                </div>
-                <svg class="progress-ring" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="40"></circle>
-                    <circle cx="50" cy="50" r="40" class="progress" id="progressCircle" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
-                </svg>
-            </div>
-
-            <div class="card p-4 shadow-sm border-top border-primary border-3 text-center position-relative">
-                <span class="voice-badge badge bg-success" onclick="toggleVoice()" id="voiceBadge">🔊 Voice ON</span>
-                <p>Operator: <b id="displayUser"></b></p>
-                <select id="courierSelect" class="form-select form-select-lg mb-3 fw-bold" onchange="handleCourierChange()">
-                    <option value="">-- SELECT COURIER --</option>
-                    <option value="ST COURIER">ST COURIER</option>
-                    <option value="BLUEDART">BLUEDART</option>
-                    <option value="XPRESS BEES">XPRESS BEES</option>
-                    <option value="DTDC">DTDC</option>
-                    <option value="DELIVERY">DELIVERY</option>
-                </select>
-                <input type="text" id="awbInput" class="form-control scan-input" placeholder="LOCKED" disabled>
-                <div class="d-grid gap-2 mt-3">
-                    <button class="btn btn-success btn-lg fw-bold" onclick="showSyncConfirmation()">COMPLETE & SYNC</button>
-                    <div class="btn-group w-100">
-                        <button class="btn btn-dark" onclick="userPrint()">PRINT PREVIEW</button>
-                        <button class="btn btn-info" onclick="exportManifestToPDF('temp')">PDF</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-7 card p-3 shadow-sm border-top border-primary border-3">
-            <h5 class="text-primary mb-3">Scanned Parcels: <span id="totalCount" class="badge bg-primary">0</span></h5>
-            <div class="table-responsive" style="max-height: 450px;">
-                <table class="table table-hover text-center">
-                    <thead><tr><th>SL</th><th>AWB</th><th>Action</th></tr></thead>
-                    <tbody id="scanBody"></tbody>
-                </table>
+        <div class="col-md-5 col-lg-4">
+            <div class="card p-5 text-center shadow">
+                <h3 class="mb-4 text-primary">Logistics Login</h3>
+                <input type="text" id="loginInput" class="form-control form-control-lg text-center mb-3" placeholder="Operator name or Admin pass" autocomplete="off">
+                <button class="btn btn-primary btn-lg w-100" onclick="handleLogin()">ENTER</button>
             </div>
         </div>
     </div>
 
-    <!-- Admin view and other sections remain the same as in previous version -->
-    <!-- ... (omitted for brevity - copy from previous full version if needed) ... -->
+    <!-- Scanner View -->
+    <div id="scannerView" style="display:none;">
+        <div class="row g-4">
+            <!-- Left column - Counter + Input -->
+            <div class="col-lg-5">
+                <div class="counter-display text-center mb-4">
+                    <div class="counter-number" id="visualCounter">0</div>
+                    <div class="counter-label">Parcels Scanned</div>
+                    <div class="counter-stats mt-4">
+                        <div class="stat-item">
+                            <div class="stat-value" id="scanRate">0</div>
+                            <div class="stat-label">Per Min</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="sessionTime">0:00</div>
+                            <div class="stat-label">Session</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="lastScan">--</div>
+                            <div class="stat-label">Last Scan</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-4 position-relative">
+                    <span class="voice-badge badge bg-success fs-6 px-3 py-2" id="voiceBadge" onclick="toggleVoice()">🔊 Voice ON</span>
+
+                    <p class="text-center mb-3">Operator: <b id="displayUser"></b></p>
+
+                    <select id="courierSelect" class="form-select form-select-lg mb-3 fw-bold" onchange="handleCourierChange()">
+                        <option value="">-- SELECT COURIER --</option>
+                        <option value="ST COURIER">ST COURIER</option>
+                        <option value="BLUEDART">BLUEDART</option>
+                        <option value="XPRESS BEES">XPRESS BEES</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="DELIVERY">DELIVERY</option>
+                    </select>
+
+                    <input type="text" id="awbInput" class="form-control scan-input" placeholder="LOCKED" disabled autocomplete="off">
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button class="btn btn-success btn-lg fw-bold" onclick="showSyncConfirmation()">COMPLETE & SYNC</button>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-dark" onclick="triggerPrint('current')">Print Preview</button>
+                            <button class="btn btn-outline-primary" onclick="exportToPDF('current')">Export PDF</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column - List -->
+            <div class="col-lg-7">
+                <div class="card p-3">
+                    <h5 class="text-primary mb-3">Scanned AWBs <span id="totalCount" class="badge bg-primary ms-2">0</span></h5>
+                    <div class="table-responsive" style="max-height:520px;">
+                        <table class="table table-hover table-sm text-center align-middle">
+                            <thead class="table-light">
+                                <tr><th>#</th><th>AWB Number</th><th></th></tr>
+                            </thead>
+                            <tbody id="scanBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin View placeholder (can be expanded later) -->
+    <div id="adminView" style="display:none;">
+        <h4 class="text-center my-5 text-muted">Admin Panel – coming soon</h4>
+    </div>
+
 </div>
 
-<!-- Keep your modals, audio tags, etc. -->
+<!-- Modals -->
+<div class="modal fade" id="syncModal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Confirm Sync</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-5">
+                <h1 id="confCount" class="display-3 fw-bold mb-4">0</h1>
+                <p class="lead">parcels will be synced & emailed</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success px-5" onclick="doSync()">CONFIRM</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Audio -->
+<audio id="beepOk" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
+<audio id="beepError" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
 // ────────────────────────────────────────────────
-// Global variables
+// Globals
 // ────────────────────────────────────────────────
 let items = [];
 let opName = "";
@@ -184,164 +288,250 @@ let voiceEnabled = true;
 let keyboardEnabled = true;
 let sessionStartTime = null;
 let scanTimestamps = [];
-let sessionTimer = null;
+let sessionTimerInterval = null;
 
 const today = new Date().toISOString().split('T')[0];
 
+// Elements
+const els = {
+    visualCounter: document.getElementById('visualCounter'),
+    scanRate: document.getElementById('scanRate'),
+    sessionTime: document.getElementById('sessionTime'),
+    lastScan: document.getElementById('lastScan'),
+    totalCount: document.getElementById('totalCount'),
+    scanBody: document.getElementById('scanBody'),
+    awbInput: document.getElementById('awbInput'),
+    courierSelect: document.getElementById('courierSelect'),
+    displayUser: document.getElementById('displayUser'),
+    voiceBadge: document.getElementById('voiceBadge'),
+    keyboardBtn: document.getElementById('keyboardToggle'),
+    confCount: document.getElementById('confCount')
+};
+
 // ────────────────────────────────────────────────
-// Basic functions
+// Utility Functions
 // ────────────────────────────────────────────────
-function speakCount(count) {
+function speak(text) {
     if (!voiceEnabled) return;
-    if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(count.toString());
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    speechSynthesis.speak(u);
+}
+
+function flashSuccess() {
+    const card = document.querySelector('#scannerView .card');
+    if (card) {
+        card.classList.add('flash-success');
+        setTimeout(() => card.classList.remove('flash-success'), 700);
     }
 }
 
-function toggleVoice() {
-    voiceEnabled = !voiceEnabled;
-    const badge = document.getElementById('voiceBadge');
-    badge.textContent = voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
-    badge.className = voiceEnabled ? 'voice-badge badge bg-success' : 'voice-badge badge bg-secondary';
-    speakCount(voiceEnabled ? 'Voice enabled' : 'Voice disabled');
-}
-
-function toggleKeyboard() {
-    keyboardEnabled = !keyboardEnabled;
-    const input = document.getElementById('awbInput');
-    const btn = document.getElementById('keyboardToggle');
-    if (keyboardEnabled) {
-        input.removeAttribute('readonly');
-        btn.classList.remove('disabled');
-    } else {
-        input.setAttribute('readonly', 'readonly');
-        btn.classList.add('disabled');
-    }
-}
-
-function handleLogin() {
-    const val = document.getElementById('loginInput').value.trim();
-    if (!val) return alert("Enter name or pass");
-    
-    if (val === "0000") {
-        document.getElementById('loginView').style.display = 'none';
-        document.getElementById('adminView').style.display = 'block';
-        console.log("Admin mode");
-        return;
-    }
-
-    opName = val;
-    document.getElementById('displayUser').textContent = opName;
-    document.getElementById('loginView').style.display = 'none';
-    document.getElementById('scannerView').style.display = 'flex';
-    
-    startSessionTracking();
-    console.log("Logged in as:", opName);
-}
-
-function startSessionTracking() {
-    sessionStartTime = Date.now();
-    scanTimestamps = [];
-    updateSessionTimer();
-    sessionTimer = setInterval(updateSessionTimer, 1000);
-}
-
-function updateSessionTimer() {
-    if (!sessionStartTime) return;
-    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
-    const min = Math.floor(elapsed / 60);
-    const sec = elapsed % 60;
-    document.getElementById('sessionTime').textContent = `\( {min}: \){sec.toString().padStart(2, '0')}`;
+function updateVisualCounter() {
+    const count = items.length;
+    els.visualCounter.textContent = count;
+    els.visualCounter.classList.add('pulse-animation');
+    setTimeout(() => els.visualCounter.classList.remove('pulse-animation'), 600);
+    els.totalCount.textContent = count;
 }
 
 function updateScanRate() {
     const now = Date.now();
     scanTimestamps = scanTimestamps.filter(t => now - t < 60000);
-    document.getElementById('scanRate').textContent = scanTimestamps.length;
+    els.scanRate.textContent = scanTimestamps.length;
 }
 
-function updateVisualCounter(count) {
-    const el = document.getElementById('visualCounter');
-    el.textContent = count;
-    el.classList.add('pulse-animation');
-    setTimeout(() => el.classList.remove('pulse-animation'), 600);
+function updateSessionTimer() {
+    if (!sessionStartTime) return;
+    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    els.sessionTime.textContent = `\( {m}: \){s.toString().padStart(2,'0')}`;
+}
+
+function updateLastScan() {
+    const now = new Date();
+    els.lastScan.textContent = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+// ────────────────────────────────────────────────
+// Core Logic
+// ────────────────────────────────────────────────
+function handleLogin() {
+    const val = document.getElementById('loginInput').value.trim();
+    if (!val) return alert("Please enter name or passcode");
+
+    if (val === "0000") {
+        document.getElementById('loginView').style.display = 'none';
+        document.getElementById('adminView').style.display = 'block';
+        return;
+    }
+
+    opName = val;
+    els.displayUser.textContent = opName;
+
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('scannerView').style.display = 'block';
+
+    startSession();
+}
+
+function startSession() {
+    sessionStartTime = Date.now();
+    scanTimestamps = [];
+    sessionTimerInterval = setInterval(() => {
+        updateSessionTimer();
+        updateScanRate();
+    }, 1000);
 }
 
 function handleCourierChange() {
-    const courier = document.getElementById('courierSelect').value;
-    const input = document.getElementById('awbInput');
-    if (courier) {
-        input.disabled = false;
-        input.placeholder = "READY - Scan AWB";
-        if (keyboardEnabled) input.focus();
-    } else {
-        input.disabled = true;
-        input.placeholder = "LOCKED";
-    }
+    const ready = els.courierSelect.value !== "";
+    els.awbInput.disabled = !ready;
+    els.awbInput.placeholder = ready ? "READY – Scan AWB" : "LOCKED";
+    if (ready && keyboardEnabled) els.awbInput.focus();
 }
 
-// ────────────────────────────────────────────────
-// AWB scanning logic
-// ────────────────────────────────────────────────
-document.getElementById('awbInput').addEventListener('change', function(e) {
-    const val = this.value.trim().toUpperCase();
-    if (val.length < 6) {
+function toggleVoice() {
+    voiceEnabled = !voiceEnabled;
+    els.voiceBadge.textContent = voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
+    els.voiceBadge.className = voiceEnabled ? 'voice-badge badge bg-success' : 'voice-badge badge bg-secondary';
+    speak(voiceEnabled ? 'Voice enabled' : 'Voice disabled');
+}
+
+function toggleKeyboard() {
+    keyboardEnabled = !keyboardEnabled;
+    els.keyboardBtn.classList.toggle('disabled', !keyboardEnabled);
+    els.awbInput.readOnly = !keyboardEnabled;
+    if (keyboardEnabled && !els.awbInput.disabled) els.awbInput.focus();
+}
+
+els.awbInput.addEventListener('change', function(e) {
+    const code = this.value.trim().toUpperCase();
+    if (code.length < 6) {
         this.value = '';
         return;
     }
 
-    if (items.includes(val)) {
+    if (items.includes(code)) {
+        document.getElementById('beepError').play().catch(()=>{});
         alert("Duplicate AWB!");
-        speakCount("Duplicate");
+        speak("Duplicate");
         this.value = '';
         return;
     }
 
-    items.push(val);
+    items.push(code);
     scanTimestamps.push(Date.now());
 
-    renderScanList();
-    updateVisualCounter(items.length);
+    renderList();
+    updateVisualCounter();
     updateScanRate();
-    speakCount(items.length);
+    updateLastScan();
+    speak(items.length);
+
+    document.getElementById('beepOk').play().catch(()=>{});
+    flashSuccess();
 
     this.value = '';
-    this.focus();
-
-    // Flash effect
-    const card = document.querySelector('#scannerView .card');
-    card.classList.add('flash-success');
-    setTimeout(() => card.classList.remove('flash-success'), 600);
+    if (keyboardEnabled) this.focus();
 });
 
-function renderScanList() {
-    const tbody = document.getElementById('scanBody');
-    tbody.innerHTML = '';
-    items.forEach((awb, i) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
+function renderList() {
+    els.scanBody.innerHTML = items.map((awb, i) => `
+        <tr>
             <td>${i+1}</td>
-            <td>${awb}</td>
-            <td><button class="btn btn-sm btn-danger" onclick="removeAwb(${i})">×</button></td>
-        `;
-        tbody.appendChild(tr);
-    });
-    document.getElementById('totalCount').textContent = items.length;
+            <td class="font-monospace">${awb}</td>
+            <td><button class="btn btn-sm btn-outline-danger" onclick="removeItem(${i})">×</button></td>
+        </tr>
+    `).join('');
 }
 
-function removeAwb(index) {
-    items.splice(index, 1);
-    renderScanList();
-    updateVisualCounter(items.length);
+window.removeItem = function(idx) {
+    items.splice(idx, 1);
+    renderList();
+    updateVisualCounter();
     updateScanRate();
-    speakCount(items.length);
+    speak(items.length);
+};
+
+function showSyncConfirmation() {
+    if (items.length === 0) return alert("No parcels scanned yet.");
+    els.confCount.textContent = items.length;
+    new bootstrap.Modal(document.getElementById('syncModal')).show();
 }
 
-// Add more functions (sync, pdf, print, admin...) as needed from previous versions
+window.doSync = function() {
+    bootstrap.Modal.getInstance(document.getElementById('syncModal')).hide();
+    document.getElementById('loaderOverlay').style.display = 'flex';
 
-console.log("AWB Master Pro script loaded");
+    setTimeout(() => {
+        alert("Sync completed (mock)\n" + items.length + " AWBs sent.");
+        document.getElementById('loaderOverlay').style.display = 'none';
+
+        items = [];
+        renderList();
+        updateVisualCounter();
+        updateScanRate();
+        updateLastScan();
+    }, 1200);
+};
+
+// PDF Export (current session)
+window.exportToPDF = function() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape" });
+
+    doc.setFontSize(18);
+    doc.text(`MANIFEST - ${els.courierSelect.value || 'Unknown'}`, 20, 25);
+
+    doc.setFontSize(12);
+    doc.text(`Operator: ${opName}    Date: ${today}    Total: ${items.length}`, 20, 38);
+
+    const tableData = items.map((awb, i) => [i+1, awb]);
+
+    doc.autoTable({
+        startY: 50,
+        head: [['No', 'AWB Number']],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 4 },
+        headStyles: { fillColor: [0,74,153] },
+        columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' } }
+    });
+
+    doc.save(`manifest-${today}.pdf`);
+};
+
+// Print preview (simple)
+window.triggerPrint = function() {
+    const printDiv = document.getElementById('printView');
+    document.getElementById('p-courier').textContent = els.courierSelect.value || 'Unknown Courier';
+    document.getElementById('p-op').textContent = opName;
+    document.getElementById('p-date').textContent = today;
+    document.getElementById('p-count').textContent = items.length;
+
+    const grid = document.getElementById('p-grid');
+    grid.innerHTML = '';
+
+    const cols = 2; // change to 3 or 4 if you want
+    const perCol = Math.ceil(items.length / cols);
+
+    for (let c = 0; c < cols; c++) {
+        const chunk = items.slice(c * perCol, (c+1) * perCol);
+        if (chunk.length === 0) continue;
+
+        let html = '<table class="table table-bordered table-sm"><thead><tr><th>#</th><th>AWB</th></tr></thead><tbody>';
+        chunk.forEach((awb, i) => {
+            html += `<tr><td>\( {c*perCol + i + 1}</td><td> \){awb}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        grid.innerHTML += html;
+    }
+
+    window.print();
+};
+
+console.log("Medika AWB Scanner → loaded");
 </script>
 </body>
 </html>
