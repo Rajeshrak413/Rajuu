@@ -1,135 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medika Bazaar | AWB Master Pro</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- SheetJS for Excel -->
+    <!-- SheetJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- jsPDF + autoTable for PDF -->
+    <!-- jsPDF + autoTable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
 
     <style>
         :root {
             --medika: #004a99;
+            --medika-dark: #003366;
+            --success: #28a745;
             --danger: #dc3545;
-            --locked: #e9ecef;
+            --locked: #f8f9fa;
             --ready: #fffde7;
         }
+
         body {
-            background: #f4f7f6;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            font-family: system-ui, -apple-system, sans-serif;
         }
+
         .navbar {
             background: var(--medika);
-            color: white;
             border-bottom: 4px solid #e74c3c;
         }
+
         .card {
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+        }
+
         .scan-input {
-            font-size: 2.4rem;
-            height: 85px;
+            font-size: 2.6rem;
+            height: 90px;
+            font-weight: 700;
             text-align: center;
-            font-weight: bold;
             background: var(--locked);
             border: 4px solid #ced4da;
-            transition: all 0.25s;
+            border-radius: 12px;
+            transition: all 0.3s ease;
         }
         .scan-input:focus {
             border-color: var(--medika);
-            box-shadow: 0 0 0 0.25rem rgba(0,74,153,0.25);
+            box-shadow: 0 0 0 0.35rem rgba(0,74,153,0.22);
+            background: white;
         }
-        #loaderOverlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(255,255,255,0.92);
-            z-index: 9999;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+        .scan-input::placeholder {
+            color: #adb5bd;
+            opacity: 1;
         }
-        .spinner {
-            width: 56px;
-            height: 56px;
-            border: 6px solid #f3f3f3;
-            border-top: 6px solid var(--medika);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
         .counter-display {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px;
-            padding: 24px;
             color: white;
-            box-shadow: 0 8px 25px rgba(102,126,234,0.35);
+            border-radius: 16px;
+            padding: 28px 20px;
+            box-shadow: 0 10px 30px rgba(102,126,234,0.3);
             position: relative;
             overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        .counter-display:hover {
+            transform: scale(1.015);
         }
         .counter-number {
-            font-size: 6rem;
+            font-size: 7rem;
             font-weight: 900;
             line-height: 1;
-            text-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            text-shadow: 0 5px 15px rgba(0,0,0,0.45);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .counter-label {
-            font-size: 1.3rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            opacity: 0.9;
-            margin-top: 8px;
+        .counter-number.pulse {
+            animation: pulseNumber 0.7s ease-out;
         }
+        @keyframes pulseNumber {
+            0%   { transform: scale(1); }
+            40%  { transform: scale(1.18); color: #ffd700; }
+            100% { transform: scale(1); }
+        }
+
         .stat-value {
-            font-size: 2.1rem;
+            font-size: 2.4rem;
             font-weight: 700;
-        }
-        .stat-label {
-            font-size: 0.85rem;
-            opacity: 0.85;
-            text-transform: uppercase;
         }
 
         .voice-badge {
             position: absolute;
-            top: 12px;
-            right: 12px;
+            top: 14px;
+            right: 14px;
+            font-size: 1rem;
+            padding: 6px 12px;
             cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .voice-badge:hover {
+            transform: scale(1.08);
         }
 
         .keyboard-toggle {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
-            width: 64px;
-            height: 64px;
+            bottom: 28px;
+            right: 28px;
+            width: 68px;
+            height: 68px;
             border-radius: 50%;
             background: var(--medika);
             color: white;
-            font-size: 1.8rem;
+            font-size: 1.9rem;
             border: none;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            transition: all 0.3s ease;
             z-index: 1000;
+        }
+        .keyboard-toggle:hover {
+            transform: scale(1.12) translateY(-4px);
+            background: var(--medika-dark);
         }
         .keyboard-toggle.disabled {
             background: #6c757d;
         }
 
-        .flash-success {
-            animation: flash 0.6s;
+        .btn-success, .btn-primary, .btn-info, .btn-dark {
+            transition: all 0.25s ease;
         }
-        @keyframes flash {
-            0%,100% { background-color: transparent; }
-            50% { background-color: rgba(40,167,69,0.15); }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+        }
+
+        .flash-success {
+            animation: flashGreen 0.6s ease-out;
+        }
+        @keyframes flashGreen {
+            0%   { background: rgba(40,167,69,0); }
+            30%  { background: rgba(40,167,69,0.25); }
+            100% { background: rgba(40,167,69,0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal.fade .modal-dialog {
+            transform: scale(0.8);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .modal.show .modal-dialog {
+            transform: scale(1);
         }
 
         @media print {
@@ -141,39 +177,39 @@
 <body>
 
 <div id="loaderOverlay">
-    <div class="spinner mb-3"></div>
+    <div class="spinner mb-4"></div>
     <h5 class="fw-bold text-primary">Processing...</h5>
 </div>
 
 <!-- Print layout -->
-<div id="printView" style="display:none;">
-    <h2 class="text-center fw-bold text-decoration-underline mb-4">MANIFEST</h2>
-    <div class="d-flex justify-content-between align-items-center mb-3">
+<div id="printView" style="display:none; padding:20px;">
+    <h2 class="text-center fw-bold mb-4">MANIFEST</h2>
+    <div class="d-flex justify-content-between mb-4">
         <h3 id="p-courier" class="fw-bold"></h3>
         <h3 id="p-count" class="border border-dark px-4 py-2 rounded-pill"></h3>
     </div>
-    <p>Operator: <b id="p-op"></b>  |  Date: <b id="p-date"></b></p>
-    <div id="p-grid" style="display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));"></div>
+    <p class="mb-4">Operator: <b id="p-op"></b> • Date: <b id="p-date"></b></p>
+    <div id="p-grid" style="display:grid; gap:20px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));"></div>
 </div>
 
 <nav class="navbar navbar-dark py-3 no-print">
     <div class="container-fluid">
-        <span class="fw-bold fs-5">MEDIKA BAZAAR LOGISTICS</span>
-        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">LOGOUT</button>
+        <span class="fw-bold fs-4">MEDIKA BAZAAR LOGISTICS</span>
+        <button class="btn btn-outline-light btn-sm px-4" onclick="location.reload()">LOGOUT</button>
     </div>
 </nav>
 
-<button id="keyboardToggle" class="keyboard-toggle" onclick="toggleKeyboard()" title="Toggle keyboard input">⌨️</button>
+<button id="keyboardToggle" class="keyboard-toggle" onclick="toggleKeyboard()" title="Toggle keyboard">⌨️</button>
 
 <div class="container mt-4 no-print">
 
     <!-- Login -->
     <div id="loginView" class="row justify-content-center mt-5">
         <div class="col-md-5 col-lg-4">
-            <div class="card p-5 text-center shadow">
-                <h3 class="mb-4 text-primary">Logistics Login</h3>
-                <input type="text" id="loginInput" class="form-control form-control-lg text-center mb-3" placeholder="Operator name or Admin pass" autocomplete="off">
-                <button class="btn btn-primary btn-lg w-100" onclick="handleLogin()">ENTER</button>
+            <div class="card p-5 text-center shadow fade-in">
+                <h3 class="mb-4 text-primary fw-bold">Logistics Login</h3>
+                <input type="text" id="loginInput" class="form-control form-control-lg text-center mb-4" placeholder="Name or Admin pass" autocomplete="off">
+                <button class="btn btn-primary btn-lg w-100 fw-bold" onclick="handleLogin()">ENTER</button>
             </div>
         </div>
     </div>
@@ -181,31 +217,32 @@
     <!-- Scanner View -->
     <div id="scannerView" style="display:none;">
         <div class="row g-4">
-            <!-- Left column - Counter + Input -->
+            <!-- Left – Counter & Input -->
             <div class="col-lg-5">
-                <div class="counter-display text-center mb-4">
+                <div class="counter-display text-center mb-4 fade-in">
                     <div class="counter-number" id="visualCounter">0</div>
                     <div class="counter-label">Parcels Scanned</div>
-                    <div class="counter-stats mt-4">
-                        <div class="stat-item">
+
+                    <div class="d-flex justify-content-around mt-4">
+                        <div class="text-center">
                             <div class="stat-value" id="scanRate">0</div>
-                            <div class="stat-label">Per Min</div>
+                            <div class="stat-label small">PER MIN</div>
                         </div>
-                        <div class="stat-item">
+                        <div class="text-center">
                             <div class="stat-value" id="sessionTime">0:00</div>
-                            <div class="stat-label">Session</div>
+                            <div class="stat-label small">SESSION</div>
                         </div>
-                        <div class="stat-item">
+                        <div class="text-center">
                             <div class="stat-value" id="lastScan">--</div>
-                            <div class="stat-label">Last Scan</div>
+                            <div class="stat-label small">LAST SCAN</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="card p-4 position-relative">
-                    <span class="voice-badge badge bg-success fs-6 px-3 py-2" id="voiceBadge" onclick="toggleVoice()">🔊 Voice ON</span>
+                <div class="card p-4 position-relative fade-in">
+                    <span class="voice-badge badge bg-success px-3 py-2 fs-6" id="voiceBadge" onclick="toggleVoice()">🔊 Voice ON</span>
 
-                    <p class="text-center mb-3">Operator: <b id="displayUser"></b></p>
+                    <p class="text-center mb-3 fw-bold">Operator: <span id="displayUser"></span></p>
 
                     <select id="courierSelect" class="form-select form-select-lg mb-3 fw-bold" onchange="handleCourierChange()">
                         <option value="">-- SELECT COURIER --</option>
@@ -216,26 +253,33 @@
                         <option value="DELIVERY">DELIVERY</option>
                     </select>
 
-                    <input type="text" id="awbInput" class="form-control scan-input" placeholder="LOCKED" disabled autocomplete="off">
+                    <input type="text" id="awbInput" class="scan-input form-control" placeholder="LOCKED" disabled autocomplete="off">
 
-                    <div class="d-grid gap-2 mt-4">
+                    <div class="d-grid gap-3 mt-4">
                         <button class="btn btn-success btn-lg fw-bold" onclick="showSyncConfirmation()">COMPLETE & SYNC</button>
-                        <div class="btn-group">
-                            <button class="btn btn-outline-dark" onclick="triggerPrint('current')">Print Preview</button>
-                            <button class="btn btn-outline-primary" onclick="exportToPDF('current')">Export PDF</button>
+                        <div class="btn-group w-100">
+                            <button class="btn btn-outline-dark" onclick="triggerPrint()">Print Preview</button>
+                            <button class="btn btn-outline-primary" onclick="exportToPDF()">Export PDF</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right column - List -->
+            <!-- Right – List -->
             <div class="col-lg-7">
-                <div class="card p-3">
-                    <h5 class="text-primary mb-3">Scanned AWBs <span id="totalCount" class="badge bg-primary ms-2">0</span></h5>
+                <div class="card p-3 fade-in">
+                    <h5 class="text-primary mb-3">
+                        Scanned Parcels
+                        <span id="totalCount" class="badge bg-primary ms-2">0</span>
+                    </h5>
                     <div class="table-responsive" style="max-height:520px;">
-                        <table class="table table-hover table-sm text-center align-middle">
+                        <table class="table table-hover table-sm">
                             <thead class="table-light">
-                                <tr><th>#</th><th>AWB Number</th><th></th></tr>
+                                <tr>
+                                    <th>#</th>
+                                    <th>AWB Number</th>
+                                    <th style="width:60px;"></th>
+                                </tr>
                             </thead>
                             <tbody id="scanBody"></tbody>
                         </table>
@@ -245,42 +289,37 @@
         </div>
     </div>
 
-    <!-- Admin View placeholder (can be expanded later) -->
-    <div id="adminView" style="display:none;">
-        <h4 class="text-center my-5 text-muted">Admin Panel – coming soon</h4>
-    </div>
-
 </div>
 
-<!-- Modals -->
-<div class="modal fade" id="syncModal">
+<!-- Sync Confirmation Modal -->
+<div class="modal fade" id="syncModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
+        <div class="modal-content border-0 shadow">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">Confirm Sync</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body text-center py-5">
-                <h1 id="confCount" class="display-3 fw-bold mb-4">0</h1>
-                <p class="lead">parcels will be synced & emailed</p>
+                <h1 id="confCount" class="display-3 fw-bold mb-3">0</h1>
+                <p class="lead mb-0">parcels will be synced & emailed</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success px-5" onclick="doSync()">CONFIRM</button>
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success px-5 fw-bold" onclick="doSync()">CONFIRM</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Audio -->
-<audio id="beepOk" src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3"></audio>
-<audio id="beepError" src="https://assets.mixkit.co/active_storage/sfx/2851/2851-preview.mp3"></audio>
+<audio id="beepOk"    src="https://assets.mixkit.co/sfx/preview/mixkit-confirmation-tone-2869.mp3"></audio>
+<audio id="beepError" src="https://assets.mixkit.co/sfx/preview/mixkit-error-tone-2909.mp3"></audio>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 // ────────────────────────────────────────────────
-// Globals
+// Globals & Elements
 // ────────────────────────────────────────────────
 let items = [];
 let opName = "";
@@ -288,80 +327,59 @@ let voiceEnabled = true;
 let keyboardEnabled = true;
 let sessionStartTime = null;
 let scanTimestamps = [];
-let sessionTimerInterval = null;
+let sessionTimer = null;
 
 const today = new Date().toISOString().split('T')[0];
 
-// Elements
 const els = {
     visualCounter: document.getElementById('visualCounter'),
-    scanRate: document.getElementById('scanRate'),
-    sessionTime: document.getElementById('sessionTime'),
-    lastScan: document.getElementById('lastScan'),
-    totalCount: document.getElementById('totalCount'),
-    scanBody: document.getElementById('scanBody'),
-    awbInput: document.getElementById('awbInput'),
+    scanRate:      document.getElementById('scanRate'),
+    sessionTime:   document.getElementById('sessionTime'),
+    lastScan:      document.getElementById('lastScan'),
+    totalCount:    document.getElementById('totalCount'),
+    scanBody:      document.getElementById('scanBody'),
+    awbInput:      document.getElementById('awbInput'),
     courierSelect: document.getElementById('courierSelect'),
-    displayUser: document.getElementById('displayUser'),
-    voiceBadge: document.getElementById('voiceBadge'),
-    keyboardBtn: document.getElementById('keyboardToggle'),
-    confCount: document.getElementById('confCount')
+    displayUser:   document.getElementById('displayUser'),
+    voiceBadge:    document.getElementById('voiceBadge'),
+    keyboardBtn:   document.getElementById('keyboardToggle'),
+    confCount:     document.getElementById('confCount')
 };
 
 // ────────────────────────────────────────────────
-// Utility Functions
+// Voice & Keyboard
 // ────────────────────────────────────────────────
 function speak(text) {
     if (!voiceEnabled) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
-    speechSynthesis.speak(u);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    speechSynthesis.speak(utterance);
 }
 
-function flashSuccess() {
-    const card = document.querySelector('#scannerView .card');
-    if (card) {
-        card.classList.add('flash-success');
-        setTimeout(() => card.classList.remove('flash-success'), 700);
-    }
+function toggleVoice() {
+    voiceEnabled = !voiceEnabled;
+    els.voiceBadge.textContent = voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
+    els.voiceBadge.className = voiceEnabled ? 'voice-badge badge bg-success px-3 py-2 fs-6' : 'voice-badge badge bg-secondary px-3 py-2 fs-6';
+    speak(voiceEnabled ? 'Voice enabled' : 'Voice disabled');
 }
 
-function updateVisualCounter() {
-    const count = items.length;
-    els.visualCounter.textContent = count;
-    els.visualCounter.classList.add('pulse-animation');
-    setTimeout(() => els.visualCounter.classList.remove('pulse-animation'), 600);
-    els.totalCount.textContent = count;
-}
-
-function updateScanRate() {
-    const now = Date.now();
-    scanTimestamps = scanTimestamps.filter(t => now - t < 60000);
-    els.scanRate.textContent = scanTimestamps.length;
-}
-
-function updateSessionTimer() {
-    if (!sessionStartTime) return;
-    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
-    const m = Math.floor(elapsed / 60);
-    const s = elapsed % 60;
-    els.sessionTime.textContent = `\( {m}: \){s.toString().padStart(2,'0')}`;
-}
-
-function updateLastScan() {
-    const now = new Date();
-    els.lastScan.textContent = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+function toggleKeyboard() {
+    keyboardEnabled = !keyboardEnabled;
+    els.keyboardBtn.classList.toggle('disabled', !keyboardEnabled);
+    els.awbInput.readOnly = !keyboardEnabled;
+    if (keyboardEnabled && !els.awbInput.disabled) els.awbInput.focus();
 }
 
 // ────────────────────────────────────────────────
-// Core Logic
+// Login & Session
 // ────────────────────────────────────────────────
 function handleLogin() {
     const val = document.getElementById('loginInput').value.trim();
-    if (!val) return alert("Please enter name or passcode");
+    if (!val) return alert("Enter name or passcode");
 
     if (val === "0000") {
         document.getElementById('loginView').style.display = 'none';
+        document.getElementById('scannerView').style.display = 'none';
         document.getElementById('adminView').style.display = 'block';
         return;
     }
@@ -378,34 +396,35 @@ function handleLogin() {
 function startSession() {
     sessionStartTime = Date.now();
     scanTimestamps = [];
-    sessionTimerInterval = setInterval(() => {
+    sessionTimer = setInterval(() => {
         updateSessionTimer();
         updateScanRate();
     }, 1000);
 }
 
-function handleCourierChange() {
-    const ready = els.courierSelect.value !== "";
-    els.awbInput.disabled = !ready;
-    els.awbInput.placeholder = ready ? "READY – Scan AWB" : "LOCKED";
-    if (ready && keyboardEnabled) els.awbInput.focus();
+function updateSessionTimer() {
+    if (!sessionStartTime) return;
+    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    els.sessionTime.textContent = `\( {m}: \){s.toString().padStart(2,'0')}`;
 }
 
-function toggleVoice() {
-    voiceEnabled = !voiceEnabled;
-    els.voiceBadge.textContent = voiceEnabled ? '🔊 Voice ON' : '🔇 Voice OFF';
-    els.voiceBadge.className = voiceEnabled ? 'voice-badge badge bg-success' : 'voice-badge badge bg-secondary';
-    speak(voiceEnabled ? 'Voice enabled' : 'Voice disabled');
+function updateScanRate() {
+    const now = Date.now();
+    scanTimestamps = scanTimestamps.filter(t => now - t < 60000);
+    els.scanRate.textContent = scanTimestamps.length;
 }
 
-function toggleKeyboard() {
-    keyboardEnabled = !keyboardEnabled;
-    els.keyboardBtn.classList.toggle('disabled', !keyboardEnabled);
-    els.awbInput.readOnly = !keyboardEnabled;
-    if (keyboardEnabled && !els.awbInput.disabled) els.awbInput.focus();
+function updateLastScan() {
+    const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    els.lastScan.textContent = t;
 }
 
-els.awbInput.addEventListener('change', function(e) {
+// ────────────────────────────────────────────────
+// Scanning
+// ────────────────────────────────────────────────
+els.awbInput.addEventListener('change', function() {
     const code = this.value.trim().toUpperCase();
     if (code.length < 6) {
         this.value = '';
@@ -423,39 +442,62 @@ els.awbInput.addEventListener('change', function(e) {
     items.push(code);
     scanTimestamps.push(Date.now());
 
-    renderList();
-    updateVisualCounter();
+    renderScanList();
+    updateVisualCounter(items.length);
     updateScanRate();
     updateLastScan();
     speak(items.length);
 
     document.getElementById('beepOk').play().catch(()=>{});
-    flashSuccess();
+
+    // Visual feedback
+    const card = document.querySelector('#scannerView .card');
+    card.classList.add('flash-success');
+    setTimeout(() => card.classList.remove('flash-success'), 700);
 
     this.value = '';
     if (keyboardEnabled) this.focus();
 });
 
-function renderList() {
+function renderScanList() {
     els.scanBody.innerHTML = items.map((awb, i) => `
-        <tr>
-            <td>${i+1}</td>
+        <tr class="fade-in">
+            <td class="fw-bold">${i+1}</td>
             <td class="font-monospace">${awb}</td>
-            <td><button class="btn btn-sm btn-outline-danger" onclick="removeItem(${i})">×</button></td>
+            <td>
+                <button class="btn btn-sm btn-outline-danger" onclick="removeAwb(${i})">×</button>
+            </td>
         </tr>
     `).join('');
+    els.totalCount.textContent = items.length;
 }
 
-window.removeItem = function(idx) {
-    items.splice(idx, 1);
-    renderList();
-    updateVisualCounter();
+window.removeAwb = function(index) {
+    items.splice(index, 1);
+    renderScanList();
+    updateVisualCounter(items.length);
     updateScanRate();
     speak(items.length);
 };
 
+function updateVisualCounter(count) {
+    els.visualCounter.textContent = count;
+    els.visualCounter.classList.add('pulse');
+    setTimeout(() => els.visualCounter.classList.remove('pulse'), 800);
+}
+
+// ────────────────────────────────────────────────
+// Courier & Sync
+// ────────────────────────────────────────────────
+function handleCourierChange() {
+    const ready = els.courierSelect.value !== "";
+    els.awbInput.disabled = !ready;
+    els.awbInput.placeholder = ready ? "READY – Scan AWB" : "LOCKED";
+    if (ready && keyboardEnabled) els.awbInput.focus();
+}
+
 function showSyncConfirmation() {
-    if (items.length === 0) return alert("No parcels scanned yet.");
+    if (items.length === 0) return alert("No parcels scanned.");
     els.confCount.textContent = items.length;
     new bootstrap.Modal(document.getElementById('syncModal')).show();
 }
@@ -464,65 +506,68 @@ window.doSync = function() {
     bootstrap.Modal.getInstance(document.getElementById('syncModal')).hide();
     document.getElementById('loaderOverlay').style.display = 'flex';
 
+    // Simulate backend call
     setTimeout(() => {
-        alert("Sync completed (mock)\n" + items.length + " AWBs sent.");
+        alert(`Success!\n${items.length} parcels synced & emailed (mock)`);
         document.getElementById('loaderOverlay').style.display = 'none';
 
         items = [];
-        renderList();
-        updateVisualCounter();
+        renderScanList();
+        updateVisualCounter(0);
         updateScanRate();
         updateLastScan();
-    }, 1200);
+    }, 1400);
 };
 
-// PDF Export (current session)
+// ────────────────────────────────────────────────
+// PDF Export
+// ────────────────────────────────────────────────
 window.exportToPDF = function() {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "landscape" });
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
-    doc.setFontSize(18);
-    doc.text(`MANIFEST - ${els.courierSelect.value || 'Unknown'}`, 20, 25);
+    doc.setFontSize(20);
+    doc.text(`MANIFEST – ${els.courierSelect.value || 'Unknown'}`, 20, 25);
 
     doc.setFontSize(12);
-    doc.text(`Operator: ${opName}    Date: ${today}    Total: ${items.length}`, 20, 38);
-
-    const tableData = items.map((awb, i) => [i+1, awb]);
+    doc.text(`Operator: ${opName}   |   Date: ${today}   |   Total: ${items.length}`, 20, 38);
 
     doc.autoTable({
         startY: 50,
         head: [['No', 'AWB Number']],
-        body: tableData,
+        body: items.map((awb, i) => [i+1, awb]),
         theme: 'grid',
         styles: { fontSize: 10, cellPadding: 4 },
         headStyles: { fillColor: [0,74,153] },
+        alternateRowStyles: { fillColor: [245,245,245] },
         columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' } }
     });
 
     doc.save(`manifest-${today}.pdf`);
 };
 
-// Print preview (simple)
+// ────────────────────────────────────────────────
+// Print Preview
+// ────────────────────────────────────────────────
 window.triggerPrint = function() {
-    const printDiv = document.getElementById('printView');
+    const grid = document.getElementById('p-grid');
+    grid.innerHTML = '';
+
     document.getElementById('p-courier').textContent = els.courierSelect.value || 'Unknown Courier';
     document.getElementById('p-op').textContent = opName;
     document.getElementById('p-date').textContent = today;
     document.getElementById('p-count').textContent = items.length;
 
-    const grid = document.getElementById('p-grid');
-    grid.innerHTML = '';
+    const columns = 2;
+    const perColumn = Math.ceil(items.length / columns);
 
-    const cols = 2; // change to 3 or 4 if you want
-    const perCol = Math.ceil(items.length / cols);
-
-    for (let c = 0; c < cols; c++) {
-        const chunk = items.slice(c * perCol, (c+1) * perCol);
-        if (chunk.length === 0) continue;
+    for (let c = 0; c < columns; c++) {
+        const chunk = items.slice(c * perColumn, (c + 1) * perColumn);
+        if (!chunk.length) continue;
 
         let html = '<table class="table table-bordered table-sm"><thead><tr><th>#</th><th>AWB</th></tr></thead><tbody>';
         chunk.forEach((awb, i) => {
-            html += `<tr><td>\( {c*perCol + i + 1}</td><td> \){awb}</td></tr>`;
+            html += `<tr><td>\( {c*perColumn + i + 1}</td><td> \){awb}</td></tr>`;
         });
         html += '</tbody></table>';
         grid.innerHTML += html;
@@ -531,7 +576,8 @@ window.triggerPrint = function() {
     window.print();
 };
 
-console.log("Medika AWB Scanner → loaded");
+// Init
+console.log("Medika AWB Master Pro → ready");
 </script>
 </body>
 </html>
